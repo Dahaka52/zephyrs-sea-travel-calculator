@@ -1,0 +1,254 @@
+/* === Zephyr global styles (applies to dialog + chat) === */
+.zephyr-calculator {
+  display: flex;
+  flex-direction: column;
+  width: max-content; /* автоширина по контенту */
+  height: auto; /* высота под контент */
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.zephyr-calculator .content {
+  flex: 0 0 auto; /* контент не растягивается */
+  margin-bottom: 10px; /* отступ до кнопок */
+}
+
+.zephyr-calculator .buttons {
+  flex: 0 0 auto; /* кнопки под контентом */
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end; /* справа */
+}
+
+.zephyr-calculator h3 { color:#4fc3f7; margin:0 0 8px 0; }
+.zephyr-calculator .key { color:#4fc3f7; font-weight:700; }
+.zephyr-calculator .val { color:#ffffff; font-weight:700; }
+.zephyr-calculator small { color:#b0bec5; }
+.zephyr-calculator table td { color:#e6eef6; vertical-align: middle; }
+
+.zephyr-calculator select,
+.zephyr-calculator select option {
+  background-color: #522a13 !important;
+  color: #eaf6ff !important;
+}
+
+/* Checkbox styling */
+.zephyr-calculator input[type="checkbox"],
+.zephyr-calculator input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #522a13;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.zephyr-calculator input[type="checkbox"]::-moz-focus-inner { border: 0; padding: 0; }
+.zephyr-calculator input[type="checkbox"]:checked {
+  background-color: #4fc3f7 !important;
+  border-color: #2eaed6 !important;
+  color: #fff !important;
+}
+
+/* Dialog specific styles */
+.zephyr-calculator .window-content {
+  background: 
+	linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
+	url('../assets/sea-map.jpg') no-repeat center center;
+  background-size: cover;
+  backdrop-filter: blur(3px);
+  color: #f0e6d2 !important;
+  padding: 0 !important;
+  overflow: visible; /* чтобы контент мог расти */
+  font-family: 'Cinzel', serif;
+}
+
+
+.zephyr-calculator .calc-container {
+  background: rgba(0,0,20,0.4);
+  backdrop-filter: blur(3px);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  min-height: auto;
+  color: #f0e6d2;
+}
+
+.zephyr-calculator .calc-content {
+  overflow-y: auto;
+  max-height: 80vh; /* скролл только если контент больше окна */
+  margin-bottom: 10px; /* отступ до кнопок */
+}
+
+.zephyr-calculator .dialog-buttons {
+  position: relative; /* не прилипает к низу окна */
+  bottom: auto;
+  background: rgba(0,0,20,0.4);
+  backdrop-filter: blur(3px);
+  color: #f0e6d2 !important;
+  padding: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-radius: 0 0 10px 10px;
+}
+
+.zephyr-calculator input,
+.zephyr-calculator select,
+.zephyr-calculator textarea {
+  background: rgba(0,0,50,0.3);
+  color: #f0e6d2;
+  border: 1px solid rgba(255,255,255,0.1);
+  padding: 6px 8px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  height: 36px;
+  line-height: 20px;
+  display: block;
+  vertical-align: middle;
+  font-family: 'Cinzel', serif;
+}
+
+.zephyr-calculator select option {
+  background-color: rgba(10,30,60,0.8);
+  color: #f0e6d2;
+}
+
+.zephyr-calculator .calc-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.zephyr-calculator .calc-label {
+  min-width: 140px;
+  font-size: 20px;
+  color: #e8d5b5; 
+}
+
+.zephyr-calculator .calc-control {
+  flex: 1;
+  max-width: 420px;
+}
+
+.zephyr-calculator .result-panel {
+  background: rgba(0,0,20,0.4);
+  padding: 8px;
+  border-radius: 8px;
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  align-items: start;
+  font-size: 1.2em;
+}
+
+.zephyr-calculator .result-card {
+  padding: 8px;
+  border-radius: 6px;
+  background: rgba(20,14,5,0.6);
+  box-shadow: 0 2px 8px rgba(82,42,19,0.5);
+}
+
+.zephyr-calculator .result-card .label {
+  color: #d6c29e;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.zephyr-calculator .result-card .value {
+  color: #7fe6ff;
+  font-weight: 800;
+  font-size: 1.2em;
+}
+
+.zephyr-calculator input[type="range"] {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 8px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 6px;
+  outline: none;
+}
+
+.zephyr-calculator input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #4fc3f7;
+  border: 2px solid rgba(255,255,255,0.85);
+  box-shadow: 0 0 10px rgba(79,195,247,0.6);
+}
+
+.zephyr-calculator .cargo-slider {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.zephyr-calculator .cargo-value {
+  min-width: 76px;
+  text-align: center;
+  font-weight: 700;
+  color: #f0e6d2;
+}
+
+/* Collapsible elements */
+.zephyr-calculator details,
+.zephyr-calculator summary,
+.zephyr-calculator .collapse,
+.zephyr-calculator .spoiler,
+.zephyr-calculator .spoiler-content {
+  background: transparent;
+  color: #ba823d;
+}
+
+.zephyr-calculator summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  cursor: pointer;
+  border-radius: 6px;
+}
+
+.zephyr-calculator summary:hover {
+  background: rgba(255,255,255,0.02);
+}
+
+.zephyr-calculator details[open] > *:not(summary),
+.zephyr-calculator .collapse.open,
+.zephyr-calculator .spoiler.open,
+.zephyr-calculator .spoiler-content.open {
+  background: rgba(168, 121, 56,0.03);
+  padding: 8px;
+  border-radius: 6px;
+  color: #b8905c;
+}
+
+.zephyr-calculator .condition-item,
+.zephyr-calculator .condition-description {
+  background: rgba(255,255,255,0.02);
+  color: #ba823d;
+  padding: 6px;
+  border-radius: 4px;
+}
+
+/* Responsive */
+@media (max-width:700px) {
+  .zephyr-calculator .result-panel {
+    grid-template-columns: 1fr;
+  }
+  .zephyr-calculator .calc-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .zephyr-calculator .calc-label {
+    min-width: auto;
+    margin-bottom: 6px;
+  }
+}
