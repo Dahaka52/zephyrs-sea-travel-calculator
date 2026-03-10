@@ -7,12 +7,12 @@ class ShipStateCalculator {
    * Calculate static ship state from inputs: cargo (tons) and crewCount.
    * Returns object with drafted depth, displacement, cargo ratios, maneuverability, etc.
    */
-  calculate(shipId, cargoTons, crewCount, options = {}) {
+  calculate(shipId, cargoTons, crewCount) {
     const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
     if (!ship) return null;
 
     cargoTons = Number(cargoTons) || 0;
-    crewCount = Math.max(0, parseInt(crewCount || 0));
+    crewCount = Math.max(0, parseInt(crewCount || 0, 10));
 
     // Crew weight in tonnes
     const crewWeightTons = (crewCount * ZEPHYR_AVG_CREW_WEIGHT_KG) / 1000.0;
@@ -29,9 +29,7 @@ class ShipStateCalculator {
     // Draft per ton: ship-specific fallback to module default
     const draftPerTon = ship.hull.draftPerTon || ZEPHYR_DRAFT_PER_TON;
 
-    // Draft computed using explicit draftPerTon if available or interpolated by hull
-    const draftRange = (ship.hull.draft?.full || 0) - (ship.hull.draft?.empty || 0);
-    // prefer physical per-ton if present
+    // Draft computed using explicit per-ton coefficient
     const currentDraft = ship.hull.draft?.empty + (effectiveCargo * draftPerTon);
 
     // Displacement: interpolate between displacement and maxDisplacement using cargo ratio clamped

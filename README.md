@@ -19,7 +19,7 @@
 - Идентификатор модуля: `zephyrs-sea-travel-calculator`
 - Версия: `1.0.0`
 - `module.json`:
-  - `compatibility.minimum = 10`
+  - `compatibility.minimum = 13`
   - `compatibility.verified = 13`
 
 Фактически код проверен под современным API Foundry (диалоги, `Hooks`, `game.settings`, `ChatMessage`) и в первую очередь рассчитан на Foundry 13.
@@ -44,8 +44,7 @@ zephyrs-sea-travel-calculator/
 │  └─ utils/
 │     └─ helpers.js                    # Создание макроса для быстрого открытия калькулятора
 ├─ styles/
-│  ├─ styles.css                       # Стили диалога и визуала
-│  └─ sea-map.jpg                      # Фон интерфейса
+│  └─ styles.css                       # Стили диалога/чата
 └─ assets/                             # Доп. изображения для UI/чата
 ```
 
@@ -220,10 +219,10 @@ zephyrs-sea-travel-calculator/
 
 Модуль хранит:
 
-- `lastInput` (`scope: world`) — последние входные параметры формы;
+- `lastInput` (`scope: client`) — последние входные параметры формы;
 - `windowSettings` (`scope: client`) — размеры/позиция окна калькулятора.
 
-Регистрация делается лениво внутри `TravelCalculator` при первом обращении.
+Регистрация выполняется на `init` (через `SeaTravelCalculator.registerSettings()`), а также проверяется повторно в экземпляре калькулятора для безопасной инициализации.
 
 ## 11. Публичный API
 
@@ -239,6 +238,7 @@ zephyrs-sea-travel-calculator/
 - `openCalculator()`
 - `toggleCalculator()`
 - `calculateShipSpeed(shipId, conditions)`
+- `calculateTravel(conditions)`
 - `getShip(shipId)`
 - `getAllShips()`
 - `getInstance()` (доступ к экземпляру `TravelCalculator`)
@@ -288,10 +288,10 @@ const speed = game.seaTravelCalculator.calculateShipSpeed("Sloop", {
 
 ## 13. Технические нюансы и ограничения
 
-- Архитектура на глобальных `var` чувствительна к порядку загрузки.
-- В `calculateAndSend()` используется `ftPerRound = speed * 10`, а в live-расчёте — точная константа `ZEPHYR_FT_PER_KNOT_PER_ROUND`; это небольшая внутренняя несогласованность.
-- Позиция окна (`top/left`) сохраняется, но при `render()` явно используется только `width` (высота и позиция применяются частично/косвенно).
-- В репозитории есть дубли изображений карты (`sea-map.jpg` в нескольких папках), что можно оптимизировать.
+- Архитектура на глобальных `var` всё ещё чувствительна к порядку загрузки, но добавлена явная проверка зависимостей.
+- Расчёт результата унифицирован: UI/чат/API используют один вычислительный путь, включая `ft/раунд`.
+- `lastInput` перенесён в `client` scope, чтобы пользователи не перетирали значения друг друга.
+- Сохранение `lastInput` в UI дебаунсится, что снижает нагрузку на `game.settings`.
 
 ## 14. Быстрая проверка после изменений
 
@@ -306,3 +306,8 @@ const speed = game.seaTravelCalculator.calculateShipSpeed("Sloop", {
 3. Отправить отчёт в чат и убедиться, что все поля заполнены корректно.
 4. Перезайти в мир и проверить восстановление `lastInput`.
 
+Команда unit-тестов ядра:
+
+```bash
+node tests/run-tests.js
+```

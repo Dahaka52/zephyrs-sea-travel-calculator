@@ -2,7 +2,16 @@
 
 Hooks.once('init', async function() {
   console.log("Zephyr's Sea Travel Calculator | Initializing module");
-  // Здесь можно зарегистрировать настройки, локализации и т.п.
+
+  try {
+    if (typeof SeaTravelCalculator !== "undefined" && typeof SeaTravelCalculator.registerSettings === "function") {
+      SeaTravelCalculator.registerSettings();
+    } else {
+      console.error("SeaTravelCalculator is not available during init.");
+    }
+  } catch (e) {
+    console.error("Zephyr: failed to register settings during init", e);
+  }
 });
 
 Hooks.once('ready', async function() {

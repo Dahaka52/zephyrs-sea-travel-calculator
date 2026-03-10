@@ -27,7 +27,7 @@
   "manifest": "",
   "download": "",
   "compatibility": {
-    "minimum": "10",
+    "minimum": "13",
     "verified": "13"
   }
 }

@@ -1,86 +1,197 @@
 // TravelCalculator singleton module
-if (typeof ZEPHYR_SHIPS_LIBRARY === 'undefined') {
-  console.error("ZEPHYR_SHIPS_LIBRARY is not defined. Check loading order in module.json");
-  var ZEPHYR_SHIPS_LIBRARY = {};
-}
-
-if (typeof ZEPHYR_WIND_COURSES === 'undefined') {
-  var ZEPHYR_WIND_COURSES = {};
-}
-if (typeof ZEPHYR_WIND_FORCES === 'undefined') {
-  var ZEPHYR_WIND_FORCES = {};
-}
-if (typeof ZEPHYR_WAVES === 'undefined') {
-  var ZEPHYR_WAVES = {};
-}
-if (typeof ZEPHYR_CREW_MODIFIERS === 'undefined') {
-  var ZEPHYR_CREW_MODIFIERS = {};
-}
 
 var SeaTravelCalculator = (() => {
-  // Singleton instance of TravelCalculator
-  let _calculatorInstance = null;
+  function ensureDependencies() {
+    const missing = [];
+
+    if (typeof ZEPHYR_MODULE_ID === "undefined") missing.push("ZEPHYR_MODULE_ID");
+    if (typeof ZEPHYR_SHIPS_LIBRARY === "undefined") missing.push("ZEPHYR_SHIPS_LIBRARY");
+    if (typeof ZEPHYR_WIND_COURSES === "undefined") missing.push("ZEPHYR_WIND_COURSES");
+    if (typeof ZEPHYR_WIND_FORCES === "undefined") missing.push("ZEPHYR_WIND_FORCES");
+    if (typeof ZEPHYR_WAVES === "undefined") missing.push("ZEPHYR_WAVES");
+    if (typeof ZEPHYR_CREW_MODIFIERS === "undefined") missing.push("ZEPHYR_CREW_MODIFIERS");
+    if (typeof ShipStateCalculator === "undefined") missing.push("ShipStateCalculator");
+
+    if (missing.length) {
+      throw new Error(`Zephyr dependencies are missing: ${missing.join(", ")}`);
+    }
+  }
 
   class TravelCalculator {
     constructor() {
       this.shipStateCalculator = new ShipStateCalculator();
+      this._lastInputSaveQueue = Promise.resolve();
+      this._windowSettingsSaveQueue = Promise.resolve();
+
+      this.ensureSettingsRegistered();
       this.lastData = this.loadLastInput();
       this.windowSettings = this.loadWindowSettings();
     }
 
-    loadLastInput() {
-      const key = `${ZEPHYR_MODULE_ID}.lastInput`;
-      if (!game.settings.settings.has(key)) {
-        game.settings.register(ZEPHYR_MODULE_ID, "lastInput", {
-          scope: "world",
-          config: false,
-          type: Object,
-          default: {
-            ship: "Sloop",
-            mode: "distance",
-            distance: 10,
-            time: 1,
-            unit: "km",
-            windCourse: "90-cross",
-            windForce: "normal",
-            waves: "calm",
-            bonusSails: "none",
-            crewType: "experienced",
-            crewCount: 8,
-            helm: false,
-            cargo: 0,
-            useOars: false
-          }
-        });
-      }
-      return game.settings.get(ZEPHYR_MODULE_ID, "lastInput");
+    getDefaultShipId() {
+      const allShips = Object.keys(ZEPHYR_SHIPS_LIBRARY);
+      return allShips.includes("Sloop") ? "Sloop" : (allShips[0] || "");
     }
 
-    loadWindowSettings() {
-      const key = `${ZEPHYR_MODULE_ID}.windowSettings`;
-      if (!game.settings.settings.has(key)) {
+    getDefaultLastInput() {
+      return {
+        ship: this.getDefaultShipId(),
+        mode: "distance",
+        distance: 10,
+        time: 1,
+        unit: "km",
+        windCourse: "90-cross",
+        windForce: "normal",
+        waves: "calm",
+        bonusSails: "none",
+        crewType: "experienced",
+        crewCount: 8,
+        helm: false,
+        cargo: 0,
+        useOars: false
+      };
+    }
+
+    getDefaultWindowSettings() {
+      return { width: 800, height: 600, top: null, left: null };
+    }
+
+    ensureSettingsRegistered() {
+      const lastInputKey = `${ZEPHYR_MODULE_ID}.lastInput`;
+      if (!game.settings.settings.has(lastInputKey)) {
+        game.settings.register(ZEPHYR_MODULE_ID, "lastInput", {
+          scope: "client",
+          config: false,
+          type: Object,
+          default: this.getDefaultLastInput()
+        });
+      }
+
+      const windowSettingsKey = `${ZEPHYR_MODULE_ID}.windowSettings`;
+      if (!game.settings.settings.has(windowSettingsKey)) {
         game.settings.register(ZEPHYR_MODULE_ID, "windowSettings", {
           scope: "client",
           config: false,
           type: Object,
-          default: { width: 800, height: 600, top: null, left: null }
+          default: this.getDefaultWindowSettings()
         });
       }
-      return game.settings.get(ZEPHYR_MODULE_ID, "windowSettings");
+    }
+
+    loadLastInput() {
+      return this.normalizeInput(game.settings.get(ZEPHYR_MODULE_ID, "lastInput"));
+    }
+
+    loadWindowSettings() {
+      const raw = game.settings.get(ZEPHYR_MODULE_ID, "windowSettings") || {};
+      const defaults = this.getDefaultWindowSettings();
+      return {
+        width: Number(raw.width) > 0 ? Number(raw.width) : defaults.width,
+        height: Number(raw.height) > 0 ? Number(raw.height) : defaults.height,
+        top: Number.isFinite(raw.top) ? Number(raw.top) : defaults.top,
+        left: Number.isFinite(raw.left) ? Number(raw.left) : defaults.left
+      };
+    }
+
+    queueSettingSave(queueProp, key, value) {
+      this[queueProp] = this[queueProp]
+        .catch(() => undefined)
+        .then(() => game.settings.set(ZEPHYR_MODULE_ID, key, value))
+        .catch(err => {
+          console.warn(`Zephyr: failed to save setting '${key}'`, err);
+        });
+      return this[queueProp];
     }
 
     saveLastInput(data) {
-      game.settings.set(ZEPHYR_MODULE_ID, "lastInput", data);
-      this.lastData = data;
+      const normalized = this.normalizeInput(data);
+      this.lastData = normalized;
+      return this.queueSettingSave("_lastInputSaveQueue", "lastInput", normalized);
     }
 
     saveWindowSettings(settings) {
-      game.settings.set(ZEPHYR_MODULE_ID, "windowSettings", settings);
-      this.windowSettings = settings;
+      const defaults = this.getDefaultWindowSettings();
+      const normalized = {
+        width: Number(settings?.width) > 0 ? Math.round(settings.width) : defaults.width,
+        height: Number(settings?.height) > 0 ? Math.round(settings.height) : defaults.height,
+        top: Number.isFinite(settings?.top) ? Math.round(settings.top) : defaults.top,
+        left: Number.isFinite(settings?.left) ? Math.round(settings.left) : defaults.left
+      };
+      this.windowSettings = normalized;
+      return this.queueSettingSave("_windowSettingsSaveQueue", "windowSettings", normalized);
+    }
+
+    toNonNegativeNumber(value, fallback = 0) {
+      const n = Number(value);
+      if (!isFinite(n)) return fallback;
+      return Math.max(0, n);
+    }
+
+    normalizeInput(rawData = {}) {
+      const defaults = this.getDefaultLastInput();
+      const merged = { ...defaults, ...(rawData || {}) };
+      const shipId = ZEPHYR_SHIPS_LIBRARY[merged.ship] ? merged.ship : defaults.ship;
+      const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
+
+      const shipCourses = (ship?.sailing?.availableCourses && ship.sailing.availableCourses.length)
+        ? ship.sailing.availableCourses
+        : Object.keys(ZEPHYR_WIND_COURSES);
+      const windCourse = shipCourses.includes(merged.windCourse) ? merged.windCourse : (shipCourses[0] || defaults.windCourse);
+
+      const windForce = Object.prototype.hasOwnProperty.call(ZEPHYR_WIND_FORCES, merged.windForce)
+        ? merged.windForce
+        : defaults.windForce;
+      const waves = Object.prototype.hasOwnProperty.call(ZEPHYR_WAVES, merged.waves)
+        ? merged.waves
+        : defaults.waves;
+      const crewType = Object.prototype.hasOwnProperty.call(ZEPHYR_CREW_MODIFIERS, merged.crewType)
+        ? merged.crewType
+        : defaults.crewType;
+
+      const availableBonusSails = this.getAvailableBonusSails(shipId);
+      const bonusSails = Object.prototype.hasOwnProperty.call(availableBonusSails, merged.bonusSails)
+        ? merged.bonusSails
+        : "none";
+
+      const hasOars = this.hasOars(shipId);
+
+      return {
+        ship: shipId,
+        mode: merged.mode === "time" ? "time" : "distance",
+        distance: this.toNonNegativeNumber(merged.distance, defaults.distance),
+        time: this.toNonNegativeNumber(merged.time, defaults.time),
+        unit: merged.unit === "mi" ? "mi" : "km",
+        windCourse,
+        windForce,
+        waves,
+        bonusSails,
+        crewType,
+        crewCount: Math.max(0, parseInt(merged.crewCount || 0, 10)),
+        helm: !!merged.helm,
+        cargo: this.toNonNegativeNumber(merged.cargo, defaults.cargo),
+        useOars: hasOars ? !!merged.useOars : false
+      };
     }
 
     calculateShipState(shipId, cargoTons, crewCount) {
       return this.shipStateCalculator.calculate(shipId, cargoTons, crewCount);
+    }
+
+    calculateShipStateForTurning(shipId, cargoTons, crewCount, crewType) {
+      const state = this.calculateShipState(shipId, cargoTons, crewCount);
+      if (!state) return null;
+
+      const crewMod = ZEPHYR_CREW_MODIFIERS?.[crewType];
+      const maneuverMultiplier = crewMod?.maneuverabilityMultiplier ?? 1;
+      const maneuverability = Math.max(
+        ZEPHYR_MIN_MANEUVERABILITY,
+        state.maneuverability * maneuverMultiplier
+      );
+
+      return {
+        ...state,
+        maneuverability
+      };
     }
 
     // Unified speed calculation used by UI and API
@@ -88,11 +199,12 @@ var SeaTravelCalculator = (() => {
       const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
       const wind = ZEPHYR_WIND_FORCES[windForce] || { mult: 1 };
       const wave = ZEPHYR_WAVES[waves] || { mult: 1 };
-      const crewMod = ZEPHYR_CREW_MODIFIERS[crewType] || { multiplier: 1, maneuverabilityMultiplier: 1 };
+      const crewMod = ZEPHYR_CREW_MODIFIERS[crewType] || { multiplier: 1 };
 
       if (!ship) throw new Error("Invalid shipId for calculateSpeed");
 
       const shipState = this.calculateShipState(shipId, cargoTons, crewCount);
+      if (!shipState) throw new Error("Unable to calculate ship state");
 
       // Convert windCourse to angle (0..180)
       const windAngle = this.courseToAngle(windCourse);
@@ -112,11 +224,12 @@ var SeaTravelCalculator = (() => {
       }
 
       // Oars handling
-      if (useOars && ship.sailing?.oars?.available) {
-        if (windForce === 'calm' && crewCount >= ship.sailing.oars.crewRequired) {
+      if (useOars && ship.sailing?.oars?.available && windForce === "calm") {
+        if (crewCount >= ship.sailing.oars.crewRequired) {
           speed = Math.max(speed, ship.sailing.oars.maxSpeed);
-        } else if (windForce === 'calm') {
-          speed += ship.sailing.oars.speedBonus * Math.min(1, (crewCount / ship.sailing.oars.crewRequired));
+        } else {
+          const ratio = Math.min(1, crewCount / ship.sailing.oars.crewRequired);
+          speed += ship.sailing.oars.speedBonus * ratio;
         }
       }
 
@@ -126,33 +239,50 @@ var SeaTravelCalculator = (() => {
       speed *= crewMod.multiplier;
       speed *= shipState.speedMultiplier;
 
-      // Wave resistance (more complex function)
+      // Wave resistance
       const waveHeight = this.getWaveHeight(waves);
-      if (typeof ship.modifiers?.waveResistance === 'function') {
+      if (typeof ship.modifiers?.waveResistance === "function") {
         speed *= ship.modifiers.waveResistance(waveHeight);
       }
 
-      // Helm gives fixed speed bonus (tuneable)
+      // Helm gives fixed speed bonus
       if (helm) speed += 5;
 
       return Math.max(0.01, speed);
     }
 
-    // Main travel calculation (distance or time mode)
-    calculateTravel(shipId, mode, distance, time, unit, windCourse, windForce, waves, bonusSails, crewType, helm, cargoTons, crewCount, useOars = false) {
-      const speed = this.calculateSpeed(shipId, windCourse, windForce, waves, bonusSails, crewType, helm, cargoTons, crewCount, useOars);
+    calculateTravelFromData(rawData = {}) {
+      const data = this.normalizeInput(rawData);
+      const ship = ZEPHYR_SHIPS_LIBRARY[data.ship];
+
+      if (!ship) {
+        throw new Error(`Ship '${data.ship}' not found`);
+      }
+
+      const speed = this.calculateSpeed(
+        data.ship,
+        data.windCourse,
+        data.windForce,
+        data.waves,
+        data.bonusSails,
+        data.crewType,
+        data.helm,
+        data.cargo,
+        data.crewCount,
+        data.useOars
+      );
       const ftPerRound = speed * ZEPHYR_FT_PER_KNOT_PER_ROUND;
 
-      const shipState = this.calculateShipState(shipId, cargoTons, crewCount);
+      const shipState = this.calculateShipStateForTurning(data.ship, data.cargo, data.crewCount, data.crewType);
+      if (!shipState) throw new Error("Unable to calculate turning state");
 
-      // Turning radius
-      const windAngle = this.courseToAngle(windCourse);
+      const windAngle = this.courseToAngle(data.windCourse);
       const turningData = this.shipStateCalculator.calculateTurningRadius(
-        ZEPHYR_SHIPS_LIBRARY[shipId],
+        ship,
         shipState,
         speed,
-        windForce,
-        waves,
+        data.windForce,
+        data.waves,
         windAngle
       );
 
@@ -160,43 +290,68 @@ var SeaTravelCalculator = (() => {
       shipState.turnRadiusM = turningData.radiusM;
       shipState.turningFactors = turningData.factors;
 
-      let result = { speed, ftPerRound, shipState, turningData };
+      const result = { speed, ftPerRound, shipState, turningData, input: data };
 
-      if (mode === 'distance') {
-        const distNm = unit === 'km' ? (distance / 1.852) : distance;
-        const hours = distNm / speed;
+      if (data.mode === "distance") {
+        const distNm = data.unit === "km" ? (data.distance / 1.852) : data.distance;
+        const hours = distNm / Math.max(0.0001, speed);
         const d = Math.floor(hours / 24);
         const h = Math.floor(hours % 24);
         const m = Math.round((hours * 60) % 60);
         result.time = { days: d, hours: h, minutes: m };
-        result.distance = distance;
-        result.unit = unit;
+        result.distance = data.distance;
+        result.unit = data.unit;
       } else {
-        const distNm = time * speed;
-        const distanceKm = distNm * 1.852;
-        const distanceMi = distNm;
+        const distNm = data.time * speed;
         result.distanceNm = distNm;
-        result.distanceKm = distanceKm;
-        result.distanceMi = distanceMi;
-        result.timeHours = time;
+        result.distanceKm = distNm * 1.852;
+        result.distanceMi = distNm;
+        result.timeHours = data.time;
       }
 
       return result;
     }
 
+    // Legacy signature kept for API compatibility
+    calculateTravel(shipId, mode, distance, time, unit, windCourse, windForce, waves, bonusSails, crewType, helm, cargoTons, crewCount, useOars = false) {
+      return this.calculateTravelFromData({
+        ship: shipId,
+        mode,
+        distance,
+        time,
+        unit,
+        windCourse,
+        windForce,
+        waves,
+        bonusSails,
+        crewType,
+        helm,
+        cargo: cargoTons,
+        crewCount,
+        useOars
+      });
+    }
+
     // Helper conversions and small accessors
     courseToAngle(windCourse) {
       const angleMap = {
-        "45-close": 45, "60-close": 60, "90-cross": 90,
-        "90-cross-sq": 90, "135-broad": 135, "180-run": 180
+        "45-close": 45,
+        "60-close": 60,
+        "90-cross": 90,
+        "90-cross-sq": 90,
+        "135-broad": 135,
+        "180-run": 180
       };
       return angleMap[windCourse] ?? 90;
     }
 
     getWaveHeight(waves) {
       const heightMap = {
-        "calm": 0.2, "ripple": 0.75, "wave": 1.5, 
-        "stwave": 3.0, "storm": 6.0
+        "calm": 0.2,
+        "ripple": 0.75,
+        "wave": 1.5,
+        "stwave": 3.0,
+        "storm": 6.0
       };
       return heightMap[waves] ?? 0.5;
     }
@@ -212,16 +367,18 @@ var SeaTravelCalculator = (() => {
       if (!ship) return "";
 
       const state = this.calculateShipState(shipId, cargoTons, crewCount);
+      if (!state) return "";
+
       const cargoPercent = Math.round((state.effectiveCargo / (ship.capacity.maxCargo || 1)) * 100);
 
       let features = "";
       if (ship.features) {
-        features = `<br>• Особенности: ${ship.features.rigging || ''} ${ship.features.oars || ''}`;
+        features = `<br>• Особенности: ${ship.features.rigging || ""} ${ship.features.oars || ""}`;
       }
 
       let armament = "";
       if (ship.armament) {
-        armament = `<br>• Вооружение: ${ship.armament.mainBattery?.count || 0}×${ship.armament.mainBattery?.caliber || ''}`;
+        armament = `<br>• Вооружение: ${ship.armament.mainBattery?.count || 0}×${ship.armament.mainBattery?.caliber || ""}`;
       }
 
       let oarsInfo = "";
@@ -234,7 +391,7 @@ var SeaTravelCalculator = (() => {
           <strong>${ship.name}</strong> <br><em>${ship.description}</em>
           <div style="margin-top:6px;">
             <strong>Характеристики:</strong><br>
-            • Длина: ${ship.hull.length?.gundeck?.toFixed(1) ?? ship.hull.length?.toFixed?.(1) ?? 'N/A'} м, Ширина: ${ship.hull.beam} м<br>
+            • Длина: ${ship.hull.length?.gundeck?.toFixed(1) ?? ship.hull.length?.toFixed?.(1) ?? "N/A"} м, Ширина: ${ship.hull.beam} м<br>
             • Осадка: ${state.currentDraft.toFixed(2)} м (порожняя: ${ship.hull.draft.empty} м, полная: ${ship.hull.draft.full} м)<br>
             • Водоизмещение: ${state.currentDisplacement.toFixed(0)} т<br>
             • Загруженность: ${state.effectiveCargo.toFixed(2)} т (включая экипаж ${state.crewWeightTons.toFixed(2)} т) — ${cargoPercent}%<br>
@@ -257,16 +414,22 @@ var SeaTravelCalculator = (() => {
 
   // Public API wrapper (singleton)
   return {
-    // internal holders
     _calculatorInstance: null,
     _uiInstance: null,
 
+    registerSettings: function() {
+      const calc = this.getInstance();
+      calc.ensureSettingsRegistered();
+      return calc;
+    },
+
     getInstance: function() {
+      ensureDependencies();
       if (!this._calculatorInstance) this._calculatorInstance = new TravelCalculator();
       return this._calculatorInstance;
     },
 
-    // initialize возвращает singleton UI (не создаёт новый каждый раз)
+    // initialize returns singleton UI (does not create a new one each time)
     initialize: function() {
       const calc = this.getInstance();
       if (!this._uiInstance) {
@@ -277,58 +440,42 @@ var SeaTravelCalculator = (() => {
 
     openCalculator: function() {
       const ui = this.initialize();
-      // render() уже проверяет this.dialog и закроет/переключит при необходимости
       ui.render();
+      return ui;
     },
 
     toggleCalculator: function() {
-      // Получаем singleton UI — если уже есть dialog — фокусируем, иначе открываем
       const ui = this.initialize();
-
-      try {
-        // Если диалог уже существует в UI — поднимаем окно и фокусируем
-        if (ui && ui.dialog) {
-          // Найдём обёртку window-app для этого диалога
-          const dialogEl = document.querySelector('.zephyr-calculator, .zephyrs-sea-travel-calculator');
-          const winApp = dialogEl?.closest?.('.app.window-app');
-          if (winApp) {
-            // Выясним текущий max z-index среди окон и поднимем это окно выше
-            const allWindowApps = Array.from(document.querySelectorAll('.app.window-app'));
-            let maxZ = allWindowApps.reduce((m, w) => {
-              const z = parseInt(window.getComputedStyle(w).zIndex) || 0;
-              return Math.max(m, z);
-            }, 0);
-            winApp.style.zIndex = (maxZ + 1).toString();
-            const focusable = winApp.querySelector('input, select, textarea, button, [tabindex]');
-            if (focusable && typeof focusable.focus === 'function') focusable.focus();
-            return;
-          }
-        }
-
-        // Иначе — просто открыть UI (render создаст диалог)
-        ui.render();
-      } catch (e) {
-        console.error("Zephyr: toggleCalculator error", e);
-        // На случай ошибки — попытаемся открыть заново
-        try { ui.render(); } catch (e2) { console.error("Zephyr: fallback render failed", e2); }
-      }
+      ui.toggle();
+      return ui;
     },
 
-    // convenience wrappers unchanged...
+    focusCalculator: function() {
+      const ui = this.initialize();
+      ui.focusDialog();
+      return ui;
+    },
+
     calculateShipSpeed: function(shipId, conditions = {}) {
       const calc = this.getInstance();
+      const input = calc.normalizeInput({ ship: shipId, ...conditions });
       return calc.calculateSpeed(
-        shipId,
-        conditions.windCourse || '90-cross',
-        conditions.windForce || 'normal',
-        conditions.waves || 'calm',
-        conditions.bonusSails || 'none',
-        conditions.crewType || 'experienced',
-        conditions.helm || false,
-        conditions.cargo || 0,
-        conditions.crewCount || 0,
-        conditions.useOars || false
+        input.ship,
+        input.windCourse,
+        input.windForce,
+        input.waves,
+        input.bonusSails,
+        input.crewType,
+        input.helm,
+        input.cargo,
+        input.crewCount,
+        input.useOars
       );
+    },
+
+    calculateTravel: function(conditions = {}) {
+      const calc = this.getInstance();
+      return calc.calculateTravelFromData(conditions);
     },
 
     getShip: function(shipId) { return ZEPHYR_SHIPS_LIBRARY[shipId]; },
