@@ -42,7 +42,7 @@ class TravelCalculatorUI {
       width: ws.width || 850,
       height: ws.height || 750,
       resizable: true,
-      classes: ["zephyr-calculator"]
+      classes: ["zephyr-calculator", "flexcol"]
     };
 
     if (Number.isFinite(ws.top)) options.top = ws.top;
@@ -309,22 +309,13 @@ class TravelCalculatorUI {
       `<option value="${k}" ${data.crewType === k ? "selected" : ""}>${c.label}</option>`
     ).join("");
 
-    const oarsRow = ship.sailing?.oars?.available ? `
-      <div class="calc-row oars-row">
-        <div class="calc-label">Весла:</div>
-        <div class="calc-control">
-          <input type="checkbox" id="useOars" ${data.useOars ? "checked" : ""}/>
-          <span>${ship.sailing.oars.maxSpeed} уз. штиль (≥${ship.sailing.oars.crewRequired}ч)</span>
-        </div>
-      </div>` : "";
-
-    // ── Кнопки ветра (5 шт) ────────────────────────────────────────────────────
+    // ── Кнопки ветра (5 шт) ── (данные из макроса)
     const windData = [
-      { id: "calm", icon: "🪶", label: "Штиль", sub: "0-1 уз." },
-      { id: "weak", icon: "🍃", label: "Бриз", sub: "2-10 уз." },
-      { id: "normal", icon: "💨", label: "Свежий", sub: "11-21 уз." },
-      { id: "strong", icon: "🌬️", label: "Крепкий", sub: "22-33 уз." },
-      { id: "storm", icon: "⛈️", label: "Шторм", sub: "34+ уз." }
+      { id: "calm", icon: "🌫️", label: "Штиль", sub: "<5 уз." },
+      { id: "weak", icon: "🍃", label: "Бриз", sub: "5-10 уз." },
+      { id: "normal", icon: "💨", label: "Свежий", sub: "10-20 уз." },
+      { id: "strong", icon: "🌬️", label: "Крепкий", sub: "20-40 уз." },
+      { id: "storm", icon: "⛈️", label: "Шторм", sub: ">40 уз." }
     ];
     const windBtns = windData.map(w =>
       `<div class="wbtn ${data.windForce === w.id ? "active" : ""}" data-target="windForce" data-val="${w.id}">
@@ -334,13 +325,13 @@ class TravelCalculatorUI {
        </div>`
     ).join("");
 
-    // ── Кнопки волнения (5 шт) ──────────────────────────────────────────────────
+    // ── Кнопки волнения (5 шт) ── (данные из макроса)
     const waveData = [
-      { id: "calm", icon: "〰️", label: "Штиль", sub: "Гладкое" },
-      { id: "ripple", icon: "🌊", label: "Рябь", sub: "Барашки" },
-      { id: "wave", icon: "🌊🌊", label: "Волнение", sub: "Среднее" },
-      { id: "stwave", icon: "🌊🌊🌊", label: "Шторм", sub: "Сильное" },
-      { id: "storm", icon: "🌀", label: "Ураган", sub: "Опасное" }
+      { id: "calm", icon: "〰️", label: "Штиль", sub: "0-0.5 м" },
+      { id: "ripple", icon: "🌊", label: "Рябь", sub: "0.5-1 м" },
+      { id: "wave", icon: "🌊🌊", label: "Волнение", sub: "1-2 м" },
+      { id: "stwave", icon: "🌊🌊🌊", label: "Шторм", sub: "2-4 м" },
+      { id: "storm", icon: "🌀", label: "Ураган", sub: "4-8+ м" }
     ];
     const waveBtns = waveData.map(w =>
       `<div class="wbtn ${data.waves === w.id ? "active" : ""}" data-target="waves" data-val="${w.id}">
@@ -357,7 +348,7 @@ class TravelCalculatorUI {
     <div class="zephyr-layout-cols">
 
       <!-- ═══ ЛЕВАЯ КОЛОНКА: КОРАБЛЬ ═══ -->
-      <div class="zephyr-col-left">
+      <div>
         <div class="zephyr-section">
           <div class="zephyr-section__title">⚙️ Параметры корабля</div>
 
@@ -400,13 +391,11 @@ class TravelCalculatorUI {
               </div>
             </div>
           </div>
-
-          ${oarsRow}
         </div>
       </div>
 
       <!-- ═══ ПРАВАЯ КОЛОНКА: НАВИГАЦИЯ ═══ -->
-      <div class="zephyr-col-right">
+      <div>
         <div class="zephyr-section">
           <div class="zephyr-section__title">🧭 Навигация и Погода</div>
 
@@ -626,34 +615,8 @@ class TravelCalculatorUI {
       bonusSailsSelect.val(currentBonusSails);
     }
 
-    this.updateOarsOption(html, shipId);
-    if (ship.sailing?.oars?.available) {
-      html.find("#useOars").prop("checked", currentUseOars);
-    }
-
     this.updateCargoLimits(html);
     this.updateShipInfo(html);
-  }
-
-  updateOarsOption(html, shipId) {
-    const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
-    const hasOars = ship?.sailing?.oars?.available;
-    const existingOarsRow = html.find(".oars-row");
-    const hasExisting = existingOarsRow.length > 0;
-
-    if (hasOars && !hasExisting) {
-      const oarsHTML = `
-      <div class="calc-row oars-row">
-        <div class="calc-label">Весла:</div>
-        <div class="calc-control">
-          <input type="checkbox" id="useOars"/>
-          <span>${ship.sailing.oars.maxSpeed} уз. штиль (≥${ship.sailing.oars.crewRequired}ч)</span>
-        </div>
-      </div>`;
-      html.find("#cargo").closest(".calc-row").after(oarsHTML);
-    } else if (!hasOars && hasExisting) {
-      existingOarsRow.remove();
-    }
   }
 
   updateCargoLimits(html) {
