@@ -2,7 +2,7 @@
   "id": "zephyrs-sea-travel-calculator",
   "title": "Zephyr's Sea Travel Calculator",
   "description": "Реалистичный калькулятор морских путешествий",
-  "version": "1.0.0",
+  "version": "0.2.0",
   "authors": [
     {
       "name": "Zephyr"
@@ -25,8 +25,8 @@
   ],
   "packs": [],
   "url": "",
-  "manifest": "",
-  "download": "",
+  "manifest": "https://github.com/Dahaka52/zephyrs-sea-travel-calculator/raw/main/module.json",
+  "download": "https://github.com/Dahaka52/zephyrs-sea-travel-calculator/archive/refs/heads/main.zip",
   "compatibility": {
     "minimum": "13",
     "verified": "13"
