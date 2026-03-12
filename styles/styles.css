@@ -23,6 +23,54 @@
   display: none;
 }
 
+.zephyr-weather.window-app {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.zephyr-weather .window-header {
+  background: rgba(30, 20, 15, 0.75);
+  border: 1px solid rgba(184, 144, 92, 0.3);
+  border-bottom: none;
+  box-shadow: inset 0 0 10px rgba(0,0,0,0.4);
+}
+
+.zephyr-weather .window-header .window-title,
+.zephyr-weather .window-header .header-button {
+  color: #dcb881;
+}
+
+.zephyr-weather .dialog-buttons {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(20, 15, 10, 0.5);
+  border-top: 1px solid rgba(184, 144, 92, 0.3);
+}
+
+.zephyr-weather .dialog-buttons button {
+  background: linear-gradient(180deg, rgba(210, 170, 110, 0.95), rgba(155, 110, 60, 0.95));
+  color: #1f120a;
+  border: 1px solid rgba(184, 144, 92, 0.8);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.95em;
+  cursor: pointer;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.35), inset 0 0 8px rgba(255,255,255,0.12);
+}
+
+.zephyr-weather select {
+  color-scheme: dark;
+}
+
+.zephyr-weather select option {
+  background-color: #2a1c14 !important;
+  color: #e8d5b5 !important;
+}
+
 .zephyr-bg {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -66,12 +114,8 @@
   }
 }
 
-.zephyr-layout-cols .zephyr-col {
-  display: flex;
-}
-
 .zephyr-layout-cols .zephyr-col > .zephyr-section {
-  flex: 1;
+  height: 100%;
   display: flex;
   flex-direction: column;
   margin-bottom: 0;
