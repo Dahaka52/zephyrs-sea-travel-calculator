@@ -78,8 +78,8 @@
   display: flex;
   gap: 8px;
   padding: 8px 12px;
-  background: rgba(20, 15, 10, 0.5);
-  border-top: 1px solid rgba(184, 144, 92, 0.3);
+  background: transparent;
+  border-top: none;
 }
 
 .zephyr-weather .dialog-buttons button {
@@ -284,6 +284,20 @@
 .helm-toggle input[type="checkbox"] {
   align-self: start;
   margin-top: 2px;
+}
+
+.oars-toggle .oars-meta {
+  font-weight: 600;
+  color: #b7a98e;
+  margin-left: 4px;
+}
+
+.oars-toggle .oars-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.9em;
+  color: #a89475;
+  font-weight: normal;
 }
 
 /* Wind / Wave Buttons (5 per row) */

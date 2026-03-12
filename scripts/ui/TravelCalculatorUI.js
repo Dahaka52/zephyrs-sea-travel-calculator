@@ -9,6 +9,10 @@ class TravelCalculatorUI {
     this.pendingSaveTimer = null;
     this.pendingLastInput = null;
 
+    this.windowSaveDebounceMs = 250;
+    this.pendingWindowSaveTimer = null;
+    this.pendingWindowSettings = null;
+
     this.trackedWindowElement = null;
     this.onWindowMouseUp = null;
 
@@ -17,6 +21,82 @@ class TravelCalculatorUI {
       windDir: 0,   // Направление ветра (0=N, 45=NE ... 315=NW)
       shipDir: 90   // Направление движения корабля
     };
+  }
+
+  t(key, vars) {
+    if (typeof zephyrT === "function") return zephyrT(key, vars);
+    return key;
+  }
+
+  label(obj, key = "label", fallback = "") {
+    if (typeof zephyrLabel === "function") return zephyrLabel(obj, key, fallback);
+    return obj?.[key] ?? fallback;
+  }
+
+  getUnitLabel(unit) {
+    return unit === "km" ? this.t("UNIT_KM") : this.t("UNIT_NMI");
+  }
+
+  getWindCourseLabel(key) {
+    const course = ZEPHYR_WIND_COURSES?.[key];
+    return this.label(course, "label", key);
+  }
+
+  buildOarsBlock(shipId, useOars) {
+    const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
+    const oars = ship?.sailing?.oars;
+    if (!oars?.available) return "";
+    const hint = this.t("OARS_HINT", { max: oars.maxSpeed, crew: oars.crewRequired });
+    const hintExtra = this.t("OARS_HINT_PARTIAL");
+    return `
+      <div class="calc-row oars-row">
+        <div class="calc-control helm-toggle oars-toggle">
+          <input type="checkbox" id="useOars" ${useOars ? "checked" : ""}/>
+          <label for="useOars">
+            ${this.t("OARS_LABEL")}
+            <span class="oars-meta">(${hint})</span>
+            <span class="oars-note">${hintExtra}</span>
+          </label>
+        </div>
+      </div>
+    `;
+  }
+
+  updateOarsBlock(html, shipId, useOars) {
+    const container = html.find("#oarsContainer");
+    if (!container.length) return;
+    container.html(this.buildOarsBlock(shipId, useOars));
+  }
+
+  scheduleWindowSave(settings) {
+    this.pendingWindowSettings = settings;
+    if (this.pendingWindowSaveTimer) clearTimeout(this.pendingWindowSaveTimer);
+    this.pendingWindowSaveTimer = setTimeout(() => this.flushWindowSave(), this.windowSaveDebounceMs);
+  }
+
+  flushWindowSave() {
+    if (this.pendingWindowSaveTimer) {
+      clearTimeout(this.pendingWindowSaveTimer);
+      this.pendingWindowSaveTimer = null;
+    }
+    if (!this.pendingWindowSettings) return;
+    this.calculator.saveWindowSettings(this.pendingWindowSettings);
+    this.pendingWindowSettings = null;
+  }
+
+  rerenderWithLanguage() {
+    if (!this.dialog) return;
+    try {
+      const dialogElement = this.getDialogElement();
+      if (!dialogElement) return;
+      const html = $(dialogElement);
+      const data = this.getFormData(html);
+      this.calculator.lastData = this.calculator.normalizeInput(data);
+      this.dialog.close();
+      setTimeout(() => this.render(), 0);
+    } catch (e) {
+      console.warn("Zephyr: failed to rerender calculator after language change", e);
+    }
   }
 
   getDialogElement() {
@@ -62,7 +142,7 @@ class TravelCalculatorUI {
     };
 
     this.dialog = new Dialog({
-      title: "🧭 Калькулятор морского перехода",
+      title: this.t("CALC_TITLE"),
       content,
       buttons: {},
       render: html => this.initializeEventHandlers(html),
@@ -132,7 +212,7 @@ class TravelCalculatorUI {
       top: Math.round(rect.top),
       left: Math.round(rect.left)
     };
-    this.calculator.saveWindowSettings(settings);
+    this.scheduleWindowSave(settings);
   }
 
   scheduleSave(html) {
@@ -154,6 +234,7 @@ class TravelCalculatorUI {
   closeDialog() {
     this.flushPendingSave();
     this.saveWindowPosition();
+    this.flushWindowSave();
     this.teardownWindowTracking();
     this.dialog = null;
   }
@@ -322,46 +403,48 @@ class TravelCalculatorUI {
   }
 
   createDialogContent(data) {
+    const t = (key, vars) => this.t(key, vars);
     const ship = ZEPHYR_SHIPS_LIBRARY[data.ship];
 
     if (!ship) {
       return `<div class="zephyr-bg"></div><div class="zephyr-calc-wrap"><div class="zephyr-scroll">
-        <div class="zephyr-section"><p style="color:#ff6b6b;">Ошибка: корабль не найден</p></div>
+        <div class="zephyr-section"><p style="color:#ff6b6b;">${t("SHIP_NOT_FOUND")}</p></div>
       </div></div>`;
     }
 
     const availableSails = this.getAvailableBonusSails(data.ship);
     const maxCargo = this.getShipMaxCargo(data.ship);
+    const oarsBlock = this.buildOarsBlock(data.ship, data.useOars);
 
     // Доп. паруса
     const sailsOptions = Object.entries(availableSails).map(([k, s]) =>
-      `<option value="${k}" ${data.bonusSails === k ? "selected" : ""}>${s.label}</option>`
+      `<option value="${k}" ${data.bonusSails === k ? "selected" : ""}>${this.label(s)}</option>`
     ).join("");
 
     // Корабли
     const shipsOptions = Object.values(ZEPHYR_SHIPS_LIBRARY).map(s =>
-      `<option value="${s.id}" ${data.ship === s.id ? "selected" : ""}>${s.name}</option>`
+      `<option value="${s.id}" ${data.ship === s.id ? "selected" : ""}>${this.label(s, "name", s.id)}</option>`
     ).join("");
 
     const crewOptions = Object.entries(ZEPHYR_CREW_MODIFIERS).map(([k, c]) =>
-      `<option value="${k}" ${data.crewType === k ? "selected" : ""}>${c.label}</option>`
+      `<option value="${k}" ${data.crewType === k ? "selected" : ""}>${this.label(c)}</option>`
     ).join("");
 
     // ── Кнопки ветра + волнения (связанные) ──
     const windData = [
-      { id: "calm", icon: "🌫️", label: "Штиль", sub: "<5 уз." },
-      { id: "weak", icon: "🍃", label: "Бриз", sub: "5-10 уз." },
-      { id: "normal", icon: "💨", label: "Свежий", sub: "10-20 уз." },
-      { id: "strong", icon: "🌬️", label: "Крепкий", sub: "20-40 уз." },
-      { id: "storm", icon: "⛈️", label: "Шторм", sub: ">40 уз." }
+      { id: "calm", icon: "🌫️", label: t("WIND_CALM"), sub: t("WIND_CALM_SUB") },
+      { id: "weak", icon: "🍃", label: t("WIND_WEAK"), sub: t("WIND_WEAK_SUB") },
+      { id: "normal", icon: "💨", label: t("WIND_NORMAL"), sub: t("WIND_NORMAL_SUB") },
+      { id: "strong", icon: "🌬️", label: t("WIND_STRONG"), sub: t("WIND_STRONG_SUB") },
+      { id: "storm", icon: "⛈️", label: t("WIND_STORM"), sub: t("WIND_STORM_SUB") }
     ];
 
     const waveData = [
-      { id: "calm", icon: "〰️", label: "Штиль", sub: "0-0.5 м" },
-      { id: "ripple", icon: "🌊", label: "Рябь", sub: "0.5-1 м" },
-      { id: "wave", icon: "🌊🌊", label: "Волнение", sub: "1-2 м" },
-      { id: "stwave", icon: "🌊🌊🌊", label: "Шторм", sub: "2-4 м" },
-      { id: "storm", icon: "🌀", label: "Ураган", sub: "4-8+ м" }
+      { id: "calm", icon: "〰️", label: t("WAVE_CALM"), sub: t("WAVE_CALM_SUB") },
+      { id: "ripple", icon: "🌊", label: t("WAVE_RIPPLE"), sub: t("WAVE_RIPPLE_SUB") },
+      { id: "wave", icon: "🌊🌊", label: t("WAVE_WAVE"), sub: t("WAVE_WAVE_SUB") },
+      { id: "stwave", icon: "🌊🌊🌊", label: t("WAVE_STWAVE"), sub: t("WAVE_STWAVE_SUB") },
+      { id: "storm", icon: "🌀", label: t("WAVE_STORM"), sub: t("WAVE_STORM_SUB") }
     ];
 
     const windToWaveMap = { calm: "calm", weak: "ripple", normal: "wave", strong: "stwave", storm: "storm" };
@@ -373,7 +456,7 @@ class TravelCalculatorUI {
         <div class="wbtn-icon">${w.icon}</div>
         <div class="wbtn-label">${w.label}</div>
         <div class="wbtn-sub">${w.sub}</div>
-        <div class="wbtn-wave">Волны: ${wave.sub}</div>
+        <div class="wbtn-wave">${t("WAVES_LABEL")}: ${wave.sub}</div>
       </div>`;
     }).join("");
 
@@ -386,10 +469,10 @@ class TravelCalculatorUI {
       <!-- ═══ ЛЕВАЯ КОЛОНКА: КОРАБЛЬ ═══ -->
       <div class="zephyr-col">
         <div class="zephyr-section">
-          <div class="zephyr-section__title">⚙️ Параметры корабля</div>
+          <div class="zephyr-section__title">${t("SECTION_SHIP")}</div>
 
           <div class="calc-row">
-            <div class="calc-label">Корабль:</div>
+            <div class="calc-label">${t("LABEL_SHIP")}</div>
             <div class="calc-control">
               <select id="shipSelect" style="width:100%">${shipsOptions}</select>
             </div>
@@ -398,32 +481,36 @@ class TravelCalculatorUI {
           <div id="shipInfo" class="ship-info">${this.getShipDescription(data.ship, data.cargo, data.crewCount || 0)}</div>
 
           <div class="calc-row">
-            <div class="calc-label">Тип экипажа:</div>
+            <div class="calc-label">${t("LABEL_CREW_TYPE")}</div>
             <div class="calc-control">
               <select id="crewType" style="width:100%">${crewOptions}</select>
             </div>
           </div>
 
           <div class="calc-row">
-            <div class="calc-label">Экипаж (чел):</div>
+            <div class="calc-label">${t("LABEL_CREW_COUNT")}</div>
             <div class="calc-control">
               <input type="number" id="crewCount" value="${data.crewCount || 8}" min="0" step="1" style="width:80px;"/>
             </div>
           </div>
 
           <div class="calc-row">
-            <div class="calc-label">Доп. паруса:</div>
+            <div class="calc-label">${t("LABEL_BONUS_SAILS")}</div>
             <div class="calc-control">
               <select id="bonusSails" style="width:100%">${sailsOptions}</select>
             </div>
           </div>
 
+          <div id="oarsContainer">
+            ${oarsBlock}
+          </div>
+
           <div class="calc-row">
-            <div class="calc-label">Груз:</div>
+            <div class="calc-label">${t("LABEL_CARGO")}</div>
             <div class="calc-control">
               <div class="cargo-slider">
                 <input type="range" id="cargo" min="0" max="${maxCargo}" step="0.1" value="${data.cargo}">
-                <div id="cargoValue" class="cargo-value">${data.cargo} т</div>
+                <div id="cargoValue" class="cargo-value">${data.cargo} ${t("UNIT_TONS")}</div>
               </div>
             </div>
           </div>
@@ -433,26 +520,26 @@ class TravelCalculatorUI {
       <!-- ═══ ПРАВАЯ КОЛОНКА: НАВИГАЦИЯ ═══ -->
       <div class="zephyr-col">
         <div class="zephyr-section">
-          <div class="zephyr-section__title">🧭 Навигация и Погода</div>
+          <div class="zephyr-section__title">${t("SECTION_NAV")}</div>
 
           <div class="calc-row">
-            <div class="calc-label">Режим расчёта:</div>
+            <div class="calc-label">${t("LABEL_MODE")}</div>
             <div class="calc-control">
               <select id="mode" style="width:100%">
-                <option value="distance" ${data.mode === "distance" ? "selected" : ""}>По расстоянию</option>
-                <option value="time" ${data.mode === "time" ? "selected" : ""}>По времени</option>
+                <option value="distance" ${data.mode === "distance" ? "selected" : ""}>${t("MODE_DISTANCE")}</option>
+                <option value="time" ${data.mode === "time" ? "selected" : ""}>${t("MODE_TIME")}</option>
               </select>
             </div>
           </div>
 
           <div class="mode-distance" style="display:${data.mode === "distance" ? "block" : "none"}; margin-bottom: 8px;">
             <div class="calc-row">
-              <div class="calc-label">Дистанция:</div>
+              <div class="calc-label">${t("LABEL_DISTANCE")}</div>
               <div class="calc-control">
                 <input type="number" id="distance" value="${data.distance}" min="0" step="1" style="width:80px;"/>
                 <select id="unit" style="width:90px;">
-                  <option value="km" ${data.unit === "km" ? "selected" : ""}>км</option>
-                  <option value="mi" ${data.unit === "mi" ? "selected" : ""}>миль</option>
+                  <option value="km" ${data.unit === "km" ? "selected" : ""}>${t("UNIT_KM")}</option>
+                  <option value="mi" ${data.unit === "mi" ? "selected" : ""}>${t("UNIT_NMI")}</option>
                 </select>
               </div>
             </div>
@@ -460,7 +547,7 @@ class TravelCalculatorUI {
 
           <div class="mode-time" style="display:${data.mode === "time" ? "block" : "none"}; margin-bottom: 8px;">
             <div class="calc-row">
-              <div class="calc-label">Время (часов):</div>
+              <div class="calc-label">${t("LABEL_TIME_HOURS")}</div>
               <div class="calc-control">
                 <input type="number" id="time" value="${data.time}" min="0" step="0.5" style="width:80px;"/>
               </div>
@@ -468,13 +555,13 @@ class TravelCalculatorUI {
           </div>
 
           <div class="compass-container">
-            <div class="compass-hint">Внешний круг: Ветер. Внутренний: Движение.</div>
+            <div class="compass-hint">${t("COMPASS_HINT")}</div>
             <div id="compassRenderArea">
               ${this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir)}
             </div>
             <!-- Скрытые технические данные -->
             <div class="course-line">
-              Курс к ветру: <span id="derivedCourseLabel">${ZEPHYR_WIND_COURSES[data.windCourse]?.label ?? data.windCourse}</span>
+              ${t("COURSE_TO_WIND")} <span id="derivedCourseLabel">${this.getWindCourseLabel(data.windCourse)}</span>
             </div>
             <input type="hidden" id="windCourse" value="${data.windCourse}"/>
           </div>
@@ -482,11 +569,11 @@ class TravelCalculatorUI {
           <div class="calc-row helm-row">
             <div class="calc-control helm-toggle">
               <input type="checkbox" id="helm" ${data.helm ? "checked" : ""}/>
-              <label for="helm">Корабельный штурвал (+5 узлов)</label>
+              <label for="helm">${t("HELM_LABEL")}</label>
             </div>
           </div>
 
-          <div class="section-subtitle">Ветер и волны</div>
+          <div class="section-subtitle">${t("SECTION_WIND_WAVES")}</div>
           <div class="wbtn-group windsea-group">${windSeaBtns}</div>
           <input type="hidden" id="windForce" value="${data.windForce}"/>
           <input type="hidden" id="waves" value="${derivedWaves}"/>
@@ -498,7 +585,7 @@ class TravelCalculatorUI {
 
     <div class="calc-actions">
       <button type="button" class="zephyr-action-btn" id="sendToChat">
-        <i class='fas fa-ship'></i> Рассчитать и отправить в чат
+        <i class='fas fa-ship'></i> ${t("BUTTON_CALC_SEND")}
       </button>
     </div>
 
@@ -506,22 +593,22 @@ class TravelCalculatorUI {
     <div class="zephyr-results zephyr-section">
       <div id="calcResult" class="result-panel">
         <div class="result-card">
-          <div class="label">Загрузка / Экипаж</div>
+          <div class="label">${t("RESULT_CARGO_CREW")}</div>
           <div class="value" id="res-cargo">—</div>
           <div class="sub" id="res-crew">—</div>
         </div>
         <div class="result-card">
-          <div class="label">Манёвренность</div>
+          <div class="label">${t("RESULT_MANEUVER")}</div>
           <div class="value" id="res-mano">—</div>
           <div class="sub" id="res-radius">—</div>
         </div>
         <div class="result-card">
-          <div class="label">Пройдено / Затрачено</div>
+          <div class="label">${t("RESULT_DISTANCE_TIME")}</div>
           <div class="value" id="res-dist">—</div>
           <div class="sub" id="res-extra">—</div>
         </div>
         <div class="result-card">
-          <div class="label">Скорость</div>
+          <div class="label">${t("RESULT_SPEED")}</div>
           <div class="value" id="res-speed">—</div>
           <div class="sub" id="res-ft">—</div>
         </div>
@@ -553,7 +640,7 @@ class TravelCalculatorUI {
       const newCourse = this.calculateWindCourse(this.uiState.windDir, this.uiState.shipDir, shipId);
       
       html.find("#windCourse").val(newCourse);
-      html.find("#derivedCourseLabel").text(ZEPHYR_WIND_COURSES[newCourse]?.label ?? newCourse);
+      html.find("#derivedCourseLabel").text(this.getWindCourseLabel(newCourse));
 
       // Перерисовываем компас (используя HTML замену внутри контейнера)
       const compassArea = html.find("#compassRenderArea");
@@ -595,7 +682,7 @@ class TravelCalculatorUI {
 
     html.find("#cargo").on("input change", () => {
       const v = parseFloat(html.find("#cargo").val()) || 0;
-      html.find("#cargoValue").text(`${v.toFixed(1)} т`);
+      html.find("#cargoValue").text(`${v.toFixed(1)} ${this.t("UNIT_TONS")}`);
       this.updateShipInfo(html);
       recalcAndQueueSave();
     });
@@ -632,7 +719,7 @@ class TravelCalculatorUI {
     // Сброс и проверка доступности курсов при смене судна
     const newCourse = this.calculateWindCourse(this.uiState.windDir, this.uiState.shipDir, shipId);
     html.find("#windCourse").val(newCourse);
-    html.find("#derivedCourseLabel").text(ZEPHYR_WIND_COURSES[newCourse]?.label ?? newCourse);
+    html.find("#derivedCourseLabel").text(this.getWindCourseLabel(newCourse));
 
     const currentBonusSails = html.find("#bonusSails").val();
     const currentUseOars = html.find("#useOars").is(":checked");
@@ -648,6 +735,7 @@ class TravelCalculatorUI {
       bonusSailsSelect.val(currentBonusSails);
     }
 
+    this.updateOarsBlock(html, shipId, currentUseOars);
     this.updateCargoLimits(html);
     this.updateShipInfo(html);
     this.applyMinWindowHeight();
@@ -672,10 +760,10 @@ class TravelCalculatorUI {
     if (crewWeight >= maxCargoTotal) {
       cargoEl.prop("disabled", true);
       cargoEl.val(0);
-      html.find("#cargoValue").text("0.0 т");
+      html.find("#cargoValue").text(`0.0 ${this.t("UNIT_TONS")}`);
     } else {
       cargoEl.prop("disabled", false);
-      html.find("#cargoValue").text(`${cargoVal.toFixed(1)} т`);
+      html.find("#cargoValue").text(`${cargoVal.toFixed(1)} ${this.t("UNIT_TONS")}`);
     }
     this.applyMinWindowHeight();
   }
@@ -718,26 +806,26 @@ class TravelCalculatorUI {
       const result = this.calculator.calculateTravelFromData(data);
       this.displayResultCompact(html, result, result.input);
     } catch (e) {
-      html.find("#calcResult").html(`<div style="color:#ff6b6b; padding:10px;">Ошибка: ${e.message}</div>`);
+      html.find("#calcResult").html(`<div style="color:#ff6b6b; padding:10px;">${this.t("ERROR_PREFIX")} ${e.message}</div>`);
     }
   }
 
   displayResultCompact(html, result, data) {
-    html.find("#res-speed").text(`${result.speed.toFixed(2)} уз.`);
-    html.find("#res-ft").text(`${result.ftPerRound.toFixed(0)} фт/раунд`);
+    html.find("#res-speed").text(`${result.speed.toFixed(2)} ${this.t("UNIT_SPEED")}`);
+    html.find("#res-ft").text(`${result.ftPerRound.toFixed(0)} ${this.t("UNIT_FT_ROUND")}`);
 
     if (data.mode === "distance") {
-      html.find("#res-dist").text(`${data.distance} ${data.unit === "km" ? "км" : "миль"}`);
-      html.find("#res-extra").text(`${result.time.days}д ${result.time.hours}ч ${result.time.minutes}м`);
+      html.find("#res-dist").text(`${data.distance} ${this.getUnitLabel(data.unit)}`);
+      html.find("#res-extra").text(`${result.time.days}${this.t("UNIT_DAYS")} ${result.time.hours}${this.t("UNIT_HOURS")} ${result.time.minutes}${this.t("UNIT_MINUTES")}`);
     } else {
-      html.find("#res-dist").text(`${result.distanceKm.toFixed(1)} км / ${result.distanceMi.toFixed(1)} миль`);
-      html.find("#res-extra").text(`${result.timeHours} ч.`);
+      html.find("#res-dist").text(`${result.distanceKm.toFixed(1)} ${this.t("UNIT_KM")} / ${result.distanceMi.toFixed(1)} ${this.t("UNIT_NMI")}`);
+      html.find("#res-extra").text(`${result.timeHours} ${this.t("UNIT_HOURS_SHORT")}`);
     }
 
-    html.find("#res-mano").text(`≈ ${Math.round(result.shipState.turnRadiusFt)} фт`);
+    html.find("#res-mano").text(`≈ ${Math.round(result.shipState.turnRadiusFt)} ${this.t("UNIT_FT")}`);
     html.find("#res-radius").text(`${(result.shipState.maneuverability * 100).toFixed(0)}%`);
-    html.find("#res-cargo").text(`${result.shipState.effectiveCargo.toFixed(2)} т / ${this.getShipMaxCargo(data.ship)} т`);
-    html.find("#res-crew").text(`${data.crewCount} чел (≈ ${result.shipState.crewWeightTons.toFixed(2)} т)`);
+    html.find("#res-cargo").text(`${result.shipState.effectiveCargo.toFixed(2)} ${this.t("UNIT_TONS")} / ${this.getShipMaxCargo(data.ship)} ${this.t("UNIT_TONS")}`);
+    html.find("#res-crew").text(`${data.crewCount} ${this.t("UNIT_PEOPLE")} (≈ ${result.shipState.crewWeightTons.toFixed(2)} ${this.t("UNIT_TONS")})`);
   }
 
   calculateAndSend(html) {
@@ -746,7 +834,7 @@ class TravelCalculatorUI {
     this.pendingLastInput = result.input;
     this.flushPendingSave();
     this.chatRenderer.sendToChat(result.input, result);
-    ui.notifications.info("Результаты отправлены в чат!");
+    ui.notifications.info(this.t("NOTIFY_SENT"));
     this.focusDialog();
   }
 }

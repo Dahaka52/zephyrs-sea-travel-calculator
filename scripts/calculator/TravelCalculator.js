@@ -78,6 +78,28 @@ var SeaTravelCalculator = (() => {
           default: this.getDefaultWindowSettings()
         });
       }
+
+      const languageKey = `${ZEPHYR_MODULE_ID}.uiLanguage`;
+      if (!game.settings.settings.has(languageKey)) {
+        game.settings.register(ZEPHYR_MODULE_ID, "uiLanguage", {
+          name: "Язык интерфейса / UI Language",
+          hint: "Выберите язык интерфейса калькулятора (смена применяется после перерендера).",
+          scope: "client",
+          config: true,
+          type: String,
+          choices: { ru: "Русский", en: "English" },
+          default: ZEPHYR_LANG_DEFAULT,
+          onChange: () => {
+            try {
+              const api = game?.seaTravelCalculator;
+              const ui = api?._uiInstance;
+              if (ui && typeof ui.rerenderWithLanguage === "function") ui.rerenderWithLanguage();
+            } catch (e) {
+              console.warn("Zephyr: failed to apply language change", e);
+            }
+          }
+        });
+      }
     }
 
     loadLastInput() {
@@ -119,7 +141,14 @@ var SeaTravelCalculator = (() => {
         top: Number.isFinite(settings?.top) ? Math.round(settings.top) : defaults.top,
         left: Number.isFinite(settings?.left) ? Math.round(settings.left) : defaults.left
       };
+      const current = this.windowSettings || defaults;
+      const unchanged = current
+        && current.width === normalized.width
+        && current.height === normalized.height
+        && current.top === normalized.top
+        && current.left === normalized.left;
       this.windowSettings = normalized;
+      if (unchanged) return Promise.resolve(normalized);
       return this.queueSettingSave("_windowSettingsSaveQueue", "windowSettings", normalized);
     }
 
@@ -368,6 +397,9 @@ var SeaTravelCalculator = (() => {
       const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
       if (!ship) return "";
 
+      const t = (key, vars) => (typeof zephyrT === "function" ? zephyrT(key, vars) : key);
+      const label = (obj, key, fallback = "") => (typeof zephyrLabel === "function" ? zephyrLabel(obj, key, fallback) : (obj?.[key] ?? fallback));
+
       const state = this.calculateShipState(shipId, cargoTons, crewCount);
       if (!state) return "";
 
@@ -375,29 +407,31 @@ var SeaTravelCalculator = (() => {
 
       let features = "";
       if (ship.features) {
-        features = `<br>• Особенности: ${ship.features.rigging || ""} ${ship.features.oars || ""}`;
+        features = `<br>• ${t("SHIP_FEATURES")}: ${ship.features.rigging || ""} ${ship.features.oars || ""}`;
       }
 
       let armament = "";
       if (ship.armament) {
-        armament = `<br>• Вооружение: ${ship.armament.mainBattery?.count || 0}×${ship.armament.mainBattery?.caliber || ""}`;
+        const mainBattery = ship.armament.mainBattery;
+        const caliber = label(mainBattery, "caliber", mainBattery?.caliber || "");
+        armament = `<br>• ${t("SHIP_ARMAMENT")}: ${mainBattery?.count || 0}×${caliber}`;
       }
 
       let oarsInfo = "";
       if (ship.sailing?.oars?.available) {
-        oarsInfo = `<br>• Весла: до ${ship.sailing.oars.maxSpeed} узлов в штиль (требуется ${ship.sailing.oars.crewRequired} гребцов)`;
+        oarsInfo = `<br>• ${t("SHIP_OARS")}: ${t("SHIP_OARS_INFO", { max: ship.sailing.oars.maxSpeed, crew: ship.sailing.oars.crewRequired })}`;
       }
 
       return `
         <div style="font-size:1.3em;line-height:1.5;">
-          <strong>${ship.name}</strong> <br><em>${ship.description}</em>
+          <strong>${label(ship, "name", ship.name)}</strong> <br><em>${label(ship, "description", ship.description)}</em>
           <div style="margin-top:6px;">
-            <strong>Характеристики:</strong><br>
-            • Длина: ${ship.hull.length?.gundeck?.toFixed(1) ?? ship.hull.length?.toFixed?.(1) ?? "N/A"} м, Ширина: ${ship.hull.beam} м<br>
-            • Осадка: ${state.currentDraft.toFixed(2)} м (порожняя: ${ship.hull.draft.empty} м, полная: ${ship.hull.draft.full} м)<br>
-            • Водоизмещение: ${state.currentDisplacement.toFixed(0)} т<br>
-            • Загруженность: ${state.effectiveCargo.toFixed(2)} т (включая экипаж ${state.crewWeightTons.toFixed(2)} т) — ${cargoPercent}%<br>
-            • Экипаж: ${crewCount} / ${ship.capacity.crew?.optimal ?? ship.capacity.crew} (оптимальный)${features}${armament}${oarsInfo}
+            <strong>${t("SHIP_STATS")}</strong><br>
+            • ${t("SHIP_LENGTH")}: ${ship.hull.length?.gundeck?.toFixed(1) ?? ship.hull.length?.toFixed?.(1) ?? "N/A"} ${t("UNIT_METER")}, ${t("SHIP_BEAM")}: ${ship.hull.beam} ${t("UNIT_METER")}<br>
+            • ${t("SHIP_DRAFT")}: ${state.currentDraft.toFixed(2)} ${t("UNIT_METER")} (${t("SHIP_DRAFT_EMPTY")}: ${ship.hull.draft.empty} ${t("UNIT_METER")}, ${t("SHIP_DRAFT_FULL")}: ${ship.hull.draft.full} ${t("UNIT_METER")})<br>
+            • ${t("SHIP_DISPLACEMENT")}: ${state.currentDisplacement.toFixed(0)} ${t("UNIT_TONS")}<br>
+            • ${t("SHIP_LOAD")}: ${state.effectiveCargo.toFixed(2)} ${t("UNIT_TONS")} (${t("SHIP_CREW").toLowerCase()} ${state.crewWeightTons.toFixed(2)} ${t("UNIT_TONS")}) — ${cargoPercent}%<br>
+            • ${t("SHIP_CREW")}: ${crewCount} / ${ship.capacity.crew?.optimal ?? ship.capacity.crew} (${t("SHIP_OPTIMAL")})${features}${armament}${oarsInfo}
           </div>
         </div>
       `;

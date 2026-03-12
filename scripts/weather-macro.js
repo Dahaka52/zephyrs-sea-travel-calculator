@@ -292,8 +292,7 @@ var ZEPHYR_WEATHER_MACRO_COMMAND = `
             ChatMessage.create({content:"<pre>Ошибка: "+err+"</pre>"});
           }
         }
-      },
-      cancel:{label:"Отмена"}
+      }
     },
     default:"ok"
   }).render(true);

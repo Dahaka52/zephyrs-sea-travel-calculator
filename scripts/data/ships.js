@@ -3,7 +3,9 @@ var ZEPHYR_SHIPS_LIBRARY = {
   "Sloop": {
     id: "Sloop",
     name: "Шлюп 8-пушечный",
+    name_en: "8-gun Sloop",
     description: "Типичное малое каботажное судно с преимущественно косым парусным вооружением.",
+    description_en: "A typical small coastal vessel with mostly fore-and-aft rigging.",
     type: "sloop",
     era: "17th century",
     hull: {
@@ -27,10 +29,10 @@ var ZEPHYR_SHIPS_LIBRARY = {
       ],
       sailConfig: {
         bonusSails: {
-          "none": { label: "Без дополнительных парусов", bonus: 0, requirements: [] },
-          "mainsail": { label: "Марсель", bonus: 1.2, requirements: ["90-cross", "135-broad", "180-run"] },
-          "topsail": { label: "Брамсель", bonus: 1.5, requirements: ["135-broad", "180-run"] },
-          "staysail": { label: "Стаксель", bonus: 0.8, requirements: ["45-close", "60-close", "90-cross"] }
+          "none": { label: "Без дополнительных парусов", label_en: "No bonus sails", bonus: 0, requirements: [] },
+          "mainsail": { label: "Марсель", label_en: "Topsail", bonus: 1.2, requirements: ["90-cross", "135-broad", "180-run"] },
+          "topsail": { label: "Брамсель", label_en: "Topgallant", bonus: 1.5, requirements: ["135-broad", "180-run"] },
+          "staysail": { label: "Стаксель", label_en: "Staysail", bonus: 0.8, requirements: ["45-close", "60-close", "90-cross"] }
         }
       },
       polarDiagram: {
@@ -75,8 +77,8 @@ var ZEPHYR_SHIPS_LIBRARY = {
       water: 1.5, 
       currentCargo: 0 
     },
-	armament: {
-      mainBattery: { count: 8, caliber: "6-ти фунтовых орудия" }
+    armament: {
+      mainBattery: { count: 8, caliber: "6-ти фунтовых орудия", caliber_en: "6-pounder guns" }
     },
     modifiers: {
       cargoSpeedPenalty: (cargoRatio) => { 
@@ -100,7 +102,9 @@ var ZEPHYR_SHIPS_LIBRARY = {
   "leRequinXebec": {
     id: "leRequinXebec",
     name: "Шебека 24-пушечная",
+    name_en: "24-gun Xebec",
     description: "Крупная шебека с косым парусным вооружением.",
+    description_en: "A large xebec with lateen rigging.",
     type: "xebec",
     era: "mid-18th century",
     hull: {
@@ -158,9 +162,9 @@ var ZEPHYR_SHIPS_LIBRARY = {
       currentCargo: 0 
     },
     armament: {
-      mainBattery: { count: 24, caliber: "8-ми фунтовых орудия" },
-      secondary: { count: 8, caliber: "4 фунта" },
-      swivelGuns: { count: 14, caliber: "2.5 фунтовых фальконетов" }
+      mainBattery: { count: 24, caliber: "8-ми фунтовых орудия", caliber_en: "8-pounder guns" },
+      secondary: { count: 8, caliber: "4 фунта", caliber_en: "4-pounder guns" },
+      swivelGuns: { count: 14, caliber: "2.5 фунтовых фальконетов", caliber_en: "2.5-pounder falconets" }
     },
     modifiers: {
       cargoSpeedPenalty: (cargoRatio) => { 
