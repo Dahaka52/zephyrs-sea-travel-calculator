@@ -188,6 +188,18 @@
   // ───────────────────────────────────────────────────────────────────────────
   // Построение HTML диалога
   // ───────────────────────────────────────────────────────────────────────────
+  const SEASON_ICONS = {
+    "Зима (DJF)": "❄️",
+    "Весна (MAM)": "🌸",
+    "Лето (JJA)": "☀️",
+    "Осень (SON)": "🍂"
+  };
+
+  function formatSeasonLabel(s) {
+    const icon = SEASON_ICONS[s] || "🗓️";
+    return icon + " " + s;
+  }
+
   function buildZoneOptions(selected) {
     return zoneKeys.map(z =>
       "<option value=\"" + z + "\"" + (z === selected ? " selected" : "") + ">" + z + "</option>"
@@ -195,9 +207,10 @@
   }
 
   function buildSeasonOptions(zone, selected) {
-    return CLIMATE[zone].seasons.map(s =>
-      "<option value=\"" + s + "\"" + (s === selected ? " selected" : "") + ">" + s + "</option>"
-    ).join("");
+    return CLIMATE[zone].seasons.map(s => {
+      const label = formatSeasonLabel(s);
+      return "<option value=\"" + s + "\"" + (s === selected ? " selected" : "") + ">" + label + "</option>";
+    }).join("");
   }
 
   function buildHourOptions(selected) {
@@ -212,7 +225,7 @@
     "<div class=\"zephyr-calc-wrap\">" +
     "<div class=\"zephyr-scroll\">" +
     "<form class=\"zephyr-section zephyr-weather-form\">" +
-    "<div class=\"zephyr-section__title\">🌊 Генератор морской погоды</div>" +
+    "<div class=\"zephyr-section__title\">Генератор морской погоды</div>" +
 
     "<div class=\"calc-row\">" +
     "<div class=\"calc-label\">Климатический пояс:</div>" +
@@ -256,7 +269,7 @@
   // Диалог
   // ───────────────────────────────────────────────────────────────────────────
   new Dialog({
-    title: "🌊 Генератор морской погоды",
+    title: "Генератор морской погоды",
     content: content,
     classes: ["zephyr-calculator", "zephyr-weather", "flexcol"],
 
@@ -265,9 +278,9 @@
       html.find("#zone").on("change", function () {
         const z = this.value;
         const seasons = CLIMATE[z] ? CLIMATE[z].seasons : [];
-        html.find("#season").html(
-          seasons.map(s => "<option value=\"" + s + "\">" + s + "</option>").join("")
-        );
+        const current = html.find("#season").val();
+        const next = seasons.includes(current) ? current : seasons[0];
+        html.find("#season").html(buildSeasonOptions(z, next));
       });
     },
 

@@ -34,11 +34,28 @@ async function createTravelMacro() {
  */
 async function createWeatherMacro() {
   try {
+    const MODULE_ID = "zephyrs-sea-travel-calculator";
     const MACRO_NAME = "Генератор морской погоды";
-    if (game.macros?.find(m => m.name === MACRO_NAME)) return;
     if (!game.user?.isGM) return;
     if (typeof ZEPHYR_WEATHER_MACRO_COMMAND === "undefined") {
       console.warn("Zephyr: ZEPHYR_WEATHER_MACRO_COMMAND не определён, weather-macro.js не загружен?");
+      return;
+    }
+    const existing = game.macros?.find(m =>
+      m?.flags?.[MODULE_ID]?.weatherMacro || /морской погоды/i.test(m.name || "")
+    );
+    if (existing) {
+      const updateData = {};
+      if (existing.name !== MACRO_NAME) updateData.name = MACRO_NAME;
+      const existingCommand = existing.command ?? existing.data?.command;
+      if (existingCommand !== ZEPHYR_WEATHER_MACRO_COMMAND) updateData.command = ZEPHYR_WEATHER_MACRO_COMMAND;
+      if (!existing.img) updateData.img = "icons/magic/air/weather-clouds-rainbow.webp";
+      updateData.flags = {
+        ...(existing.flags || {}),
+        [MODULE_ID]: { ...(existing.flags?.[MODULE_ID] || {}), weatherMacro: true }
+      };
+      if (Object.keys(updateData).length) await existing.update(updateData);
+      console.log("Zephyr's Sea Travel Calculator | Weather macro updated");
       return;
     }
     await Macro.create({
@@ -46,7 +63,7 @@ async function createWeatherMacro() {
       type: "script",
       command: ZEPHYR_WEATHER_MACRO_COMMAND,
       img: "icons/magic/air/weather-clouds-rainbow.webp",
-      flags: {}
+      flags: { [MODULE_ID]: { weatherMacro: true } }
     });
     console.log("Zephyr's Sea Travel Calculator | Weather macro created");
   } catch (err) {

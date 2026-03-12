@@ -13,6 +13,20 @@
   position: relative;
 }
 
+.zephyr-calculator .dialog-content {
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.zephyr-calculator form {
+  margin: 0;
+}
+
 .zephyr-calculator .window-resizable-handle {
   z-index: 5;
   width: 16px;
@@ -64,6 +78,8 @@
 
 .zephyr-weather select {
   color-scheme: dark;
+  background: rgba(20, 15, 10, 0.95) !important;
+  color: #e8d5b5 !important;
 }
 
 .zephyr-weather select option {
@@ -147,11 +163,13 @@
   background: rgba(20, 15, 10, 0.9) !important;
   color: #e8d5b5 !important;
   border: 1px solid rgba(184, 144, 92, 0.5) !important;
-  padding: 6px 8px;
+  padding: 7px 10px;
   border-radius: 4px;
   font-family: inherit;
   font-size: 1em;
-  height: 32px;
+  line-height: 1.2;
+  height: 38px;
+  box-sizing: border-box;
 }
 
 .zephyr-calculator select option {

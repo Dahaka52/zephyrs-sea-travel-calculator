@@ -131,11 +131,26 @@ var ZEPHYR_WEATHER_MACRO_COMMAND = `
   const savedSeason = game.user.getFlag(MODULE_ID,F_SEASON)||CLIMATE[activeZone].seasons[0];
   const activeSeason= CLIMATE[activeZone].seasons.includes(savedSeason)?savedSeason:CLIMATE[activeZone].seasons[0];
 
+  const SEASON_ICONS = {
+    "Зима (DJF)":"❄️",
+    "Весна (MAM)":"🌸",
+    "Лето (JJA)":"☀️",
+    "Осень (SON)":"🍂"
+  };
+
+  function formatSeasonLabel(s){
+    const icon = SEASON_ICONS[s] || "🗓️";
+    return icon + " " + s;
+  }
+
   function buildZoneOptions(sel){
     return zoneKeys.map(z=>"<option value=\\""+z+"\\""+( z===sel?" selected":"")+">" +z+"</option>").join("");
   }
   function buildSeasonOptions(zone,sel){
-    return CLIMATE[zone].seasons.map(s=>"<option value=\\""+s+"\\""+( s===sel?" selected":"")+">"+s+"</option>").join("");
+    return CLIMATE[zone].seasons.map(s=>{
+      const label = formatSeasonLabel(s);
+      return "<option value=\\""+s+"\\""+( s===sel?" selected":"")+">"+label+"</option>";
+    }).join("");
   }
   function buildHourOptions(sel){
     return Array.from({length:24},(_,i)=>{const h=i+1;return"<option value=\\""+h+"\\""+(h===sel?" selected":"")+">"+fmtHour(h)+"</option>";}).join("");
@@ -146,7 +161,7 @@ var ZEPHYR_WEATHER_MACRO_COMMAND = `
     "<div class=\\"zephyr-calc-wrap\\">"+
       "<div class=\\"zephyr-scroll\\">"+
         "<form class=\\"zephyr-section zephyr-weather-form\\">"+
-          "<div class=\\"zephyr-section__title\\">🌊 Генератор морской погоды</div>"+
+          "<div class=\\"zephyr-section__title\\">Генератор морской погоды</div>"+
           "<div class=\\"calc-row\\">"+
             "<div class=\\"calc-label\\">Климатический пояс:</div>"+
             "<div class=\\"calc-control\\">"+
@@ -176,13 +191,16 @@ var ZEPHYR_WEATHER_MACRO_COMMAND = `
     "</div>";
 
   new Dialog({
-    title:"🌊 Генератор морской погоды",
+    title:"Генератор морской погоды",
     content:content,
     classes: ["zephyr-calculator", "zephyr-weather", "flexcol"],
-    render:(html)=>{
+    render:(html)=>{ 
       html.find("#zone").on("change",function(){
         const z=this.value;
-        html.find("#season").html((CLIMATE[z]?CLIMATE[z].seasons:[]).map(s=>"<option value=\\""+s+"\\">"+s+"</option>").join(""));
+        const seasons=(CLIMATE[z]?CLIMATE[z].seasons:[]);
+        const current=html.find("#season").val();
+        const next=seasons.includes(current)?current:seasons[0];
+        html.find("#season").html(buildSeasonOptions(z,next));
       });
     },
     buttons:{
