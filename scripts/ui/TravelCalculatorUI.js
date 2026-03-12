@@ -181,29 +181,28 @@ class TravelCalculatorUI {
     // 0 = встречный ветер, 180 = попутный
 
     const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
-    const availableCourses = ship?.sailing?.availableCourses || Object.keys(ZEPHYR_WIND_COURSES);
+    const baseCourses = ship?.sailing?.availableCourses || Object.keys(ZEPHYR_WIND_COURSES);
+    const courseSet = new Set(baseCourses);
+    if (ZEPHYR_WIND_COURSES?.["0-dead"]) courseSet.add("0-dead");
 
-    let mappedCourse = "90-cross"; // fallback
-    if (delta <= 22.5) {
-      // 0 - мертвая зона. Если 45 недоступно, берем ближайшее доступное
-      mappedCourse = availableCourses.includes("45-close") ? "45-close" : 
-                     (availableCourses.includes("60-close") ? "60-close" : "90-cross");
-    } else if (delta <= 67.5) {
-      if (delta <= 50) mappedCourse = "45-close";
-      else mappedCourse = "60-close";
-    } else if (delta <= 112.5) {
-      mappedCourse = "90-cross";
-    } else if (delta <= 157.5) {
-      mappedCourse = "135-broad";
-    } else {
-      mappedCourse = "180-run";
+    const candidates = Array.from(courseSet).map(key => ({
+      key,
+      angle: ZEPHYR_WIND_COURSES?.[key]?.angle
+    })).filter(c => Number.isFinite(c.angle));
+
+    if (!candidates.length) return "90-cross";
+
+    let best = candidates[0].key;
+    let bestDiff = Math.abs(delta - candidates[0].angle);
+    for (let i = 1; i < candidates.length; i++) {
+      const diff = Math.abs(delta - candidates[i].angle);
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        best = candidates[i].key;
+      }
     }
 
-    // Защита от недоступных курсов у корабля
-    if (!availableCourses.includes(mappedCourse) && availableCourses.length > 0) {
-      mappedCourse = availableCourses[0];
-    }
-    return mappedCourse;
+    return best;
   }
 
   // Отрисовка двухслойной розы ветров
@@ -211,9 +210,18 @@ class TravelCalculatorUI {
     const cx = 110, cy = 110;
     const outerR = 100, innerR = 65, centerR = 30;
 
-    const dirs = [
+    const windDirs = [
       { a: 0, label: "N" }, { a: 45, label: "NE" }, { a: 90, label: "E" }, { a: 135, label: "SE" },
       { a: 180, label: "S" }, { a: 225, label: "SW" }, { a: 270, label: "W" }, { a: 315, label: "NW" }
+    ];
+
+    const shipDirs = [
+      { a: 0, label: "N" }, { a: 15, label: "" }, { a: 30, label: "" }, { a: 45, label: "NE" },
+      { a: 60, label: "" }, { a: 75, label: "" }, { a: 90, label: "E" }, { a: 105, label: "" },
+      { a: 120, label: "" }, { a: 135, label: "SE" }, { a: 150, label: "" }, { a: 165, label: "" },
+      { a: 180, label: "S" }, { a: 195, label: "" }, { a: 210, label: "" }, { a: 225, label: "SW" },
+      { a: 240, label: "" }, { a: 255, label: "" }, { a: 270, label: "W" }, { a: 285, label: "" },
+      { a: 300, label: "" }, { a: 315, label: "NW" }, { a: 330, label: "" }, { a: 345, label: "" }
     ];
 
     function polarToXY(angleDeg, radius) {
@@ -222,11 +230,12 @@ class TravelCalculatorUI {
       return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
     }
 
-    function drawRing(dirs, curAngle, type, rOut, rIn, fillBase, fillActive) {
+    function drawRing(dirs, curAngle, type, rOut, rIn, fillBase, fillActive, stepDeg) {
       let html = "";
+      const half = stepDeg / 2;
       dirs.forEach(d => {
-        const start = d.a - 22.5;
-        const end = d.a + 22.5;
+        const start = d.a - half;
+        const end = d.a + half;
         const isActive = (d.a === curAngle);
         
         const p1 = polarToXY(start, rOut);
@@ -248,8 +257,8 @@ class TravelCalculatorUI {
       return html;
     }
 
-    const outerRing = drawRing(dirs, windDir, "wind", outerR, innerR, "rgba(20, 15, 10, 0.7)", "rgba(100, 160, 200, 0.6)");
-    const innerRing = drawRing(dirs, shipDir, "ship", innerR, centerR, "rgba(40, 30, 20, 0.8)", "rgba(200, 100, 50, 0.6)");
+    const outerRing = drawRing(windDirs, windDir, "wind", outerR, innerR, "rgba(20, 15, 10, 0.7)", "rgba(100, 160, 200, 0.6)", 45);
+    const innerRing = drawRing(shipDirs, shipDir, "ship", innerR, centerR, "rgba(40, 30, 20, 0.8)", "rgba(200, 100, 50, 0.6)", 15);
 
     // Рисуем стрелку ветра (откуда дует)
     // Ветер N (0) дует С СЕВЕРА НА ЮГ. Угол стрелки = windDir + 180
@@ -433,7 +442,7 @@ class TravelCalculatorUI {
               ${this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir)}
             </div>
             <!-- Скрытые технические данные -->
-            <div style="font-size:0.9em; margin-top:6px; color:#dcb881; font-weight:bold;">
+            <div class="course-line">
               Курс к ветру: <span id="derivedCourseLabel">${ZEPHYR_WIND_COURSES[data.windCourse]?.label ?? data.windCourse}</span>
             </div>
             <input type="hidden" id="windCourse" value="${data.windCourse}"/>
@@ -446,7 +455,7 @@ class TravelCalculatorUI {
             </div>
           </div>
 
-          <div style="font-size:0.9em; font-weight:bold; color:#dcb881; margin:8px 0 4px 0;">Ветер и волны</div>
+          <div class="section-subtitle">Ветер и волны</div>
           <div class="wbtn-group windsea-group">${windSeaBtns}</div>
           <input type="hidden" id="windForce" value="${data.windForce}"/>
           <input type="hidden" id="waves" value="${derivedWaves}"/>

@@ -1,11 +1,19 @@
 // Weather and condition constants
 var ZEPHYR_WIND_COURSES = {
-  "45-close": { label: "Крутой бейдевинд ≈45°", description: "Минимальная скорость" },
-  "60-close": { label: "Бейдевинд ≈60°", description: "Низкая скорость" },
-  "90-cross": { label: "Галфвинд 90°", description: "Средняя скорость" },
-  "90-cross-sq": { label: "Галфвинд 90° (с прямыми)", description: "Боковой, с разными парусами" },
-  "135-broad": { label: "Бакштаг ≈135°", description: "Хорошая скорость" },
-  "180-run": { label: "Фордевинд 180°", description: "Максимальная скорость" }
+  "0-dead": { label: "Встречный 0°", description: "Мертвая зона", angle: 0 },
+  "15-close": { label: "Крутой бейдевинд 15°", description: "Очень острый курс", angle: 15 },
+  "30-close": { label: "Бейдевинд 30°", description: "Острый курс", angle: 30 },
+  "45-close": { label: "Бейдевинд 45°", description: "Острый курс", angle: 45 },
+  "60-close": { label: "Бейдевинд 60°", description: "Низкая скорость", angle: 60 },
+  "75-close": { label: "Бейдевинд 75°", description: "Переход к галфвинду", angle: 75 },
+  "90-cross": { label: "Галфвинд 90°", description: "Средняя скорость", angle: 90 },
+  "90-cross-sq": { label: "Галфвинд 90° (с прямыми)", description: "Боковой, с разными парусами", angle: 90 },
+  "105-broad": { label: "Полубакштаг 105°", description: "Переход к бакштагу", angle: 105 },
+  "120-broad": { label: "Бакштаг 120°", description: "Хорошая скорость", angle: 120 },
+  "135-broad": { label: "Бакштаг 135°", description: "Хорошая скорость", angle: 135 },
+  "150-run": { label: "Полный 150°", description: "Переход к фордевинду", angle: 150 },
+  "165-run": { label: "Фордевинд 165°", description: "Попутный ветер", angle: 165 },
+  "180-run": { label: "Фордевинд 180°", description: "Полный попутный", angle: 180 }
 };
 
 var ZEPHYR_WIND_FORCES = {

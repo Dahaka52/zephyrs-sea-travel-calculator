@@ -18,7 +18,13 @@ var ZEPHYR_SHIPS_LIBRARY = {
     },
     sailing: {
       maxTheoreticalSpeed: 10,
-      availableCourses: ["45-close", "60-close", "90-cross", "90-cross-sq", "135-broad", "180-run"],
+      availableCourses: [
+        "0-dead",
+        "15-close", "30-close", "45-close", "60-close", "75-close",
+        "90-cross", "90-cross-sq",
+        "105-broad", "120-broad", "135-broad",
+        "150-run", "165-run", "180-run"
+      ],
       sailConfig: {
         bonusSails: {
           "none": { label: "Без дополнительных парусов", bonus: 0, requirements: [] },
@@ -108,12 +114,18 @@ var ZEPHYR_SHIPS_LIBRARY = {
       draftPerTon: 0.012
     },
     sailing: {
-      maxTheoreticalSpeed: 12.5,
-      availableCourses: ["45-close", "60-close", "90-cross", "135-broad", "180-run"],
+      maxTheoreticalSpeed: 13.49,
+      availableCourses: [
+        "0-dead",
+        "15-close", "30-close", "45-close", "60-close", "75-close",
+        "90-cross",
+        "105-broad", "120-broad", "135-broad",
+        "150-run", "165-run", "180-run"
+      ],
       polarDiagram: {
-        "0": 0.00, "15": 0.25, "30": 0.60, "45": 0.90,
-        "60": 1.00, "75": 0.95, "90": 0.90, "105": 0.85,
-        "120": 0.80, "135": 0.75, "150": 0.70, "165": 0.55, "180": 0.40
+        "0": 0.00, "15": 0.28, "30": 0.70, "45": 0.92,
+        "60": 1.00, "75": 0.96, "90": 0.92, "105": 0.88,
+        "120": 0.82, "135": 0.76, "150": 0.68, "165": 0.58, "180": 0.45
       },
       turningRadius: {
         base: 1.0,

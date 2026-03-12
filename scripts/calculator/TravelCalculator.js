@@ -134,7 +134,11 @@ var SeaTravelCalculator = (() => {
       const merged = { ...defaults, ...(rawData || {}) };
       const shipId = ZEPHYR_SHIPS_LIBRARY[merged.ship] ? merged.ship : defaults.ship;
       const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
-      const compassAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+      const windAngles = [0, 45, 90, 135, 180, 225, 270, 315];
+      const shipAngles = [
+        0, 15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165,
+        180, 195, 210, 225, 240, 255, 270, 285, 300, 315, 330, 345
+      ];
 
       const shipCourses = (ship?.sailing?.availableCourses && ship.sailing.availableCourses.length)
         ? ship.sailing.availableCourses
@@ -173,8 +177,8 @@ var SeaTravelCalculator = (() => {
         helm: !!merged.helm,
         cargo: this.toNonNegativeNumber(merged.cargo, defaults.cargo),
         useOars: hasOars ? !!merged.useOars : false,
-        windDir: compassAngles.includes(Number(merged.windDir)) ? Number(merged.windDir) : defaults.windDir,
-        shipDir: compassAngles.includes(Number(merged.shipDir)) ? Number(merged.shipDir) : defaults.shipDir
+        windDir: windAngles.includes(Number(merged.windDir)) ? Number(merged.windDir) : defaults.windDir,
+        shipDir: shipAngles.includes(Number(merged.shipDir)) ? Number(merged.shipDir) : defaults.shipDir
       };
     }
 
@@ -339,15 +343,8 @@ var SeaTravelCalculator = (() => {
 
     // Helper conversions and small accessors
     courseToAngle(windCourse) {
-      const angleMap = {
-        "45-close": 45,
-        "60-close": 60,
-        "90-cross": 90,
-        "90-cross-sq": 90,
-        "135-broad": 135,
-        "180-run": 180
-      };
-      return angleMap[windCourse] ?? 90;
+      const angle = ZEPHYR_WIND_COURSES?.[windCourse]?.angle;
+      return Number.isFinite(angle) ? angle : 90;
     }
 
     getWaveHeight(waves) {
