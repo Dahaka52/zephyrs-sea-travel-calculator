@@ -42,7 +42,7 @@ class TravelCalculatorUI {
     const content = this.createDialogContent(data);
     const defaults = (typeof this.calculator.getDefaultWindowSettings === "function")
       ? this.calculator.getDefaultWindowSettings()
-      : { width: 1120, height: 760, top: null, left: null };
+      : { width: 1200, height: 760, top: null, left: null };
     const ws = { ...defaults, ...(this.calculator.windowSettings || {}) };
     const options = {
       width: ws.width || defaults.width,
@@ -165,8 +165,21 @@ class TravelCalculatorUI {
     const headerEl = dialogElement.querySelector(".window-header");
     if (!scrollEl) return;
     const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
-    const contentH = scrollEl.scrollHeight + 24;
-    const minH = Math.ceil(headerH + contentH);
+    const children = Array.from(scrollEl.children || []);
+    let contentH = 0;
+    if (children.length) {
+      children.forEach(child => {
+        const rect = child.getBoundingClientRect();
+        const styles = getComputedStyle(child);
+        const marginTop = parseFloat(styles.marginTop) || 0;
+        const marginBottom = parseFloat(styles.marginBottom) || 0;
+        contentH += rect.height + marginTop + marginBottom;
+      });
+    } else {
+      contentH = scrollEl.scrollHeight;
+    }
+    const paddingY = 24;
+    const minH = Math.ceil(headerH + contentH + paddingY);
     dialogElement.style.minHeight = `${minH}px`;
   }
 

@@ -55,7 +55,7 @@ var SeaTravelCalculator = (() => {
     }
 
     getDefaultWindowSettings() {
-      return { width: 1120, height: 760, top: null, left: null };
+      return { width: 1200, height: 760, top: null, left: null };
     }
 
     ensureSettingsRegistered() {

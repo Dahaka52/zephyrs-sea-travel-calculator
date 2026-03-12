@@ -142,19 +142,43 @@ var ZEPHYR_WEATHER_MACRO_COMMAND = `
   }
 
   const content=
-    "<form>"+
-    "<div style=\\"margin-bottom:10px;\\"><label style=\\"display:block;margin-bottom:5px;\\"><b>🗺️ Климатический пояс:</b></label>"+
-    "<select id=\\"zone\\" style=\\"width:100%;padding:4px 8px;color:black;background:white;border:1px solid #aaa;border-radius:4px;font-size:14px;\\">"+buildZoneOptions(activeZone)+"</select></div>"+
-    "<div style=\\"margin-bottom:10px;\\"><label style=\\"display:block;margin-bottom:5px;\\"><b>🌿 Сезон:</b></label>"+
-    "<select id=\\"season\\" style=\\"width:100%;padding:4px 8px;color:black;background:white;border:1px solid #aaa;border-radius:4px;font-size:14px;\\">"+buildSeasonOptions(activeZone,activeSeason)+"</select></div>"+
-    "<div style=\\"margin-bottom:10px;\\"><label style=\\"display:block;margin-bottom:5px;\\"><b>🕐 Текущий игровой час:</b></label>"+
-    "<select id=\\"currentHour\\" style=\\"width:100%;padding:4px 8px;color:black;background:white;border:1px solid #aaa;border-radius:4px;font-size:14px;\\">"+buildHourOptions(savedHour)+"</select></div>"+
-    "<div style=\\"margin-bottom:4px;\\"><label><input type=\\"checkbox\\" id=\\"gmOnly\\"> Выводить только ГМ</label></div>"+
-    "</form>";
+    "<div class=\\"zephyr-bg\\"></div>"+
+    "<div class=\\"zephyr-calc-wrap\\">"+
+      "<div class=\\"zephyr-scroll\\">"+
+        "<form class=\\"zephyr-section zephyr-weather-form\\">"+
+          "<div class=\\"zephyr-section__title\\">🌊 Генератор морской погоды</div>"+
+          "<div class=\\"calc-row\\">"+
+            "<div class=\\"calc-label\\">Климатический пояс:</div>"+
+            "<div class=\\"calc-control\\">"+
+              "<select id=\\"zone\\" style=\\"width:100%\\">"+buildZoneOptions(activeZone)+"</select>"+
+            "</div>"+
+          "</div>"+
+          "<div class=\\"calc-row\\">"+
+            "<div class=\\"calc-label\\">Сезон:</div>"+
+            "<div class=\\"calc-control\\">"+
+              "<select id=\\"season\\" style=\\"width:100%\\">"+buildSeasonOptions(activeZone,activeSeason)+"</select>"+
+            "</div>"+
+          "</div>"+
+          "<div class=\\"calc-row\\">"+
+            "<div class=\\"calc-label\\">Текущий час:</div>"+
+            "<div class=\\"calc-control\\">"+
+              "<select id=\\"currentHour\\" style=\\"width:100%\\">"+buildHourOptions(savedHour)+"</select>"+
+            "</div>"+
+          "</div>"+
+          "<div class=\\"calc-row\\">"+
+            "<div class=\\"calc-label\\"></div>"+
+            "<div class=\\"calc-control\\">"+
+              "<label class=\\"zephyr-checkbox-line\\"><input type=\\"checkbox\\" id=\\"gmOnly\\"> Выводить только ГМ</label>"+
+            "</div>"+
+          "</div>"+
+        "</form>"+
+      "</div>"+
+    "</div>";
 
   new Dialog({
     title:"🌊 Генератор морской погоды",
     content:content,
+    classes: ["zephyr-calculator", "zephyr-weather", "flexcol"],
     render:(html)=>{
       html.find("#zone").on("change",function(){
         const z=this.value;
