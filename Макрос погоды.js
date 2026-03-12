@@ -194,6 +194,8 @@
     "Лето (JJA)": "☀️",
     "Осень (SON)": "🍂"
   };
+  const SELECT_STYLE = "width:100%;background:rgba(20, 15, 10, 0.9);color:#e8d5b5;border:1px solid rgba(184, 144, 92, 0.5);";
+  const OPTION_STYLE = "background-color:#2a1c14;color:#e8d5b5;";
 
   function formatSeasonLabel(s) {
     const icon = SEASON_ICONS[s] || "🗓️";
@@ -202,21 +204,21 @@
 
   function buildZoneOptions(selected) {
     return zoneKeys.map(z =>
-      "<option value=\"" + z + "\"" + (z === selected ? " selected" : "") + ">" + z + "</option>"
+      "<option value=\"" + z + "\"" + (z === selected ? " selected" : "") + " style=\"" + OPTION_STYLE + "\">" + z + "</option>"
     ).join("");
   }
 
   function buildSeasonOptions(zone, selected) {
     return CLIMATE[zone].seasons.map(s => {
       const label = formatSeasonLabel(s);
-      return "<option value=\"" + s + "\"" + (s === selected ? " selected" : "") + ">" + label + "</option>";
+      return "<option value=\"" + s + "\"" + (s === selected ? " selected" : "") + " style=\"" + OPTION_STYLE + "\">" + label + "</option>";
     }).join("");
   }
 
   function buildHourOptions(selected) {
     return Array.from({ length: 24 }, (_, i) => {
       const h = i + 1;
-      return "<option value=\"" + h + "\"" + (h === selected ? " selected" : "") + ">" + fmtHour(h) + "</option>";
+      return "<option value=\"" + h + "\"" + (h === selected ? " selected" : "") + " style=\"" + OPTION_STYLE + "\">" + fmtHour(h) + "</option>";
     }).join("");
   }
 
@@ -230,7 +232,7 @@
     "<div class=\"calc-row\">" +
     "<div class=\"calc-label\">Климатический пояс:</div>" +
     "<div class=\"calc-control\">" +
-    "<select id=\"zone\" style=\"width:100%;\">" +
+    "<select id=\"zone\" style=\"" + SELECT_STYLE + "\">" +
     buildZoneOptions(activeZone) +
     "</select>" +
     "</div>" +
@@ -239,7 +241,7 @@
     "<div class=\"calc-row\">" +
     "<div class=\"calc-label\">Сезон:</div>" +
     "<div class=\"calc-control\">" +
-    "<select id=\"season\" style=\"width:100%;\">" +
+    "<select id=\"season\" style=\"" + SELECT_STYLE + "\">" +
     buildSeasonOptions(activeZone, activeSeason) +
     "</select>" +
     "</div>" +
@@ -248,7 +250,7 @@
     "<div class=\"calc-row\">" +
     "<div class=\"calc-label\">Текущий час:</div>" +
     "<div class=\"calc-control\">" +
-    "<select id=\"currentHour\" style=\"width:100%;\">" +
+    "<select id=\"currentHour\" style=\"" + SELECT_STYLE + "\">" +
     buildHourOptions(savedHour) +
     "</select>" +
     "</div>" +
@@ -275,6 +277,8 @@
 
     // При смене пояса — перестраиваем список сезонов
     render: (html) => {
+      const appEl = html.closest(".app, .window-app");
+      if (appEl.length) appEl.addClass("zephyr-calculator zephyr-weather");
       html.find("#zone").on("change", function () {
         const z = this.value;
         const seasons = CLIMATE[z] ? CLIMATE[z].seasons : [];

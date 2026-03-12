@@ -36,7 +36,6 @@ async function createWeatherMacro() {
   try {
     const MODULE_ID = "zephyrs-sea-travel-calculator";
     const MACRO_NAME = "Генератор морской погоды";
-    if (!game.user?.isGM) return;
     if (typeof ZEPHYR_WEATHER_MACRO_COMMAND === "undefined") {
       console.warn("Zephyr: ZEPHYR_WEATHER_MACRO_COMMAND не определён, weather-macro.js не загружен?");
       return;
@@ -58,6 +57,7 @@ async function createWeatherMacro() {
       console.log("Zephyr's Sea Travel Calculator | Weather macro updated");
       return;
     }
+    if (!game.user?.isGM) return;
     await Macro.create({
       name: MACRO_NAME,
       type: "script",
