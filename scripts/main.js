@@ -28,11 +28,16 @@ Hooks.once('ready', async function() {
     console.error("SeaTravelCalculator is not defined. Check script loading order.");
   }
 
-  // Create macro (helpers.js contains canonical implementation)
+  // Create macros (helpers.js contains canonical implementations)
   try {
     await createTravelMacro();
   } catch (e) {
     console.warn("Zephyr: createTravelMacro failed:", e);
+  }
+  try {
+    await createWeatherMacro();
+  } catch (e) {
+    console.warn("Zephyr: createWeatherMacro failed:", e);
   }
 
   // Inject CSS is handled by styles/styles.css loaded from module.json, no inline injection needed.

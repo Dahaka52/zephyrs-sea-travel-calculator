@@ -12,6 +12,7 @@
     "scripts/constants.js",
     "scripts/data/conditions.js",
     "scripts/data/ships.js",
+    "scripts/weather-macro.js",
     "scripts/utils/helpers.js",
     "scripts/calculator/ShipStateCalculator.js",
     "scripts/calculator/TravelCalculator.js",

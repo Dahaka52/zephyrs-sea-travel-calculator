@@ -1,245 +1,406 @@
-// == Морская погода (Флеймрул) с учётом времени суток ==
+// == Морская погода — климатические пояса, сезоны, автосохранение ==
 
 (async () => {
-  const timesOfDay = ["Утро", "День", "Вечер", "Ночь"];
-  const months = { "F": "Флеймрул" };
+  const MODULE_ID = "zephyrs-sea-travel-calculator";
+  const F_HOUR = "weatherNextHour";   // number 1–24
+  const F_ZONE = "weatherZone";        // string
+  const F_SEASON = "weatherSeason";      // string
 
-  // Направления ветра
-  const windDirections = [
-    { dir: "Северный", weight: 35, arrow: "↓" },
-    { dir: "Северо-восточный", weight: 20, arrow: "↙" },
-    { dir: "Восточный", weight: 15, arrow: "←" },
-    { dir: "Юго-восточный", weight: 20, arrow: "↖" },
-    { dir: "Южный", weight: 30, arrow: "↑" },
-    { dir: "Юго-западный", weight: 80, arrow: "↗" },
-    { dir: "Западный", weight: 100, arrow: "→" },
-    { dir: "Северо-западный", weight: 70, arrow: "↘" }
-  ];
+  const months = { "F": "Элесиас" };
 
-  // Шкала ветра
-  const windTableF = [
-    { range: "<5 уз.", label: "Штиль", weight: 4, waves: "0–0.5 м", icon: "🌫️", max: 1 },
-    { range: "5–10 уз.", label: "Лёгкий бриз", weight: 10, waves: "0.5–1 м", icon: "🍃", max: 2 },
-    { range: "10–20 уз.", label: "Свежий бриз", weight: 20, waves: "1–2 м", icon: "💨", max: 3 },
-    { range: "20–40 уз.", label: "Крепкий ветер", weight: 30, waves: "2–4 м", icon: "🌬️", max: 4 },
-    { range: ">40 уз.", label: "Шторм", weight: 2, waves: "4–8+ м", icon: "⛈️", max: 5 }
-  ];
+  // ───────────────────────────────────────────────────────────────────────────
+  // БАЗА КЛИМАТИЧЕСКИХ ДАННЫХ
+  // Источник: погодные данные.md (Pilot Charts / ERA5 / ship obs.)
+  //
+  // Структура каждого пояса:
+  //   seasons:   список доступных сезонов
+  //   directions: [N, NE, E, SE, S, SW, W, NW] — веса (сумма ~100)
+  //   windW:     { сезон: [<5kn, 5-10, 10-20, 20-40, >40] }
+  //   weatherW:  { сезон: { Ясно, Облачно, Туман, Лёгкий дождь, Сильный дождь, Гроза } }
+  // ───────────────────────────────────────────────────────────────────────────
+  const CLIMATE = {
 
-  // Базовые месячные веса погоды
-  const monthWeatherWeights = {
-    "Ясно": 18,
-    "Облачно": 5,
-    "Туман": 5,
-    "Лёгкий дождь": 10,
-    "Сильный дождь": 2,
-    "Гроза": 2
+    // ── 1. Дольдрумы / ITCZ (0–10°) ────────────────────────────────────────
+    "Дольдрумы (0–10°)": {
+      seasons: ["Зима (DJF)", "Весна (MAM)", "Лето (JJA)", "Осень (SON)"],
+      // Variable: все направления равновероятны
+      directions: [13, 13, 13, 13, 13, 13, 13, 13],
+      windW: {
+        "Зима (DJF)": [62, 25, 10, 3, 0],
+        "Весна (MAM)": [58, 28, 11, 3, 0],
+        "Лето (JJA)": [55, 30, 12, 3, 0],
+        "Осень (SON)": [60, 26, 11, 3, 0]
+      },
+      weatherW: {
+        // Дождь (42/45/48/43) разбит на лёгкий (~2/3) + сильный (~1/3)
+        "Зима (DJF)": { "Ясно": 22, "Облачно": 58, "Туман": 6, "Лёгкий дождь": 28, "Сильный дождь": 14, "Гроза": 18 },
+        "Весна (MAM)": { "Ясно": 20, "Облачно": 60, "Туман": 5, "Лёгкий дождь": 30, "Сильный дождь": 15, "Гроза": 20 },
+        "Лето (JJA)": { "Ясно": 18, "Облачно": 62, "Туман": 4, "Лёгкий дождь": 32, "Сильный дождь": 16, "Гроза": 22 },
+        "Осень (SON)": { "Ясно": 21, "Облачно": 59, "Туман": 5, "Лёгкий дождь": 29, "Сильный дождь": 14, "Гроза": 19 }
+      }
+    },
+
+    // ── 2. Пассаты (10–30°) ─────────────────────────────────────────────────
+    "Пассаты (10–30°)": {
+      seasons: ["Зима (DJF)", "Весна (MAM)", "Лето (JJA)", "Осень (SON)"],
+      // NE dominant; N, E secondary
+      // [N, NE, E, SE, S, SW, W, NW]
+      directions: [8, 70, 15, 2, 1, 1, 1, 2],
+      windW: {
+        "Зима (DJF)": [8, 21, 47, 22, 2],
+        "Весна (MAM)": [10, 24, 49, 16, 1],
+        "Лето (JJA)": [12, 27, 51, 9, 1],
+        "Осень (SON)": [9, 23, 48, 18, 2]
+      },
+      weatherW: {
+        // Дождь (12/11/10/11): лёгкий ~8, сильный ~4
+        "Зима (DJF)": { "Ясно": 48, "Облачно": 35, "Туман": 3, "Лёгкий дождь": 8, "Сильный дождь": 4, "Гроза": 4 },
+        "Весна (MAM)": { "Ясно": 50, "Облачно": 34, "Туман": 3, "Лёгкий дождь": 7, "Сильный дождь": 4, "Гроза": 4 },
+        "Лето (JJA)": { "Ясно": 52, "Облачно": 33, "Туман": 3, "Лёгкий дождь": 7, "Сильный дождь": 3, "Гроза": 3 },
+        "Осень (SON)": { "Ясно": 49, "Облачно": 35, "Туман": 3, "Лёгкий дождь": 7, "Сильный дождь": 4, "Гроза": 4 }
+      }
+    },
+
+    // ── 3. Западные ветры (30–60°) ──────────────────────────────────────────
+    "Западные ветры (30–60°)": {
+      seasons: ["Зима (DJF)", "Весна (MAM)", "Лето (JJA)", "Осень (SON)"],
+      // SW dominant; W, NW, S secondary
+      // [N, NE, E, SE, S, SW, W, NW]
+      directions: [1, 1, 1, 2, 8, 53, 22, 11],
+      windW: {
+        "Зима (DJF)": [5, 14, 38, 37, 6],
+        "Весна (MAM)": [7, 18, 42, 29, 4],
+        "Лето (JJA)": [10, 25, 45, 18, 2],
+        "Осень (SON)": [6, 16, 40, 33, 5]
+      },
+      weatherW: {
+        // Дождь (24/22/18/23): лёгкий ~2/3, сильный ~1/3
+        "Зима (DJF)": { "Ясно": 18, "Облачно": 48, "Туман": 7, "Лёгкий дождь": 16, "Сильный дождь": 8, "Гроза": 3 },
+        "Весна (MAM)": { "Ясно": 22, "Облачно": 46, "Туман": 6, "Лёгкий дождь": 15, "Сильный дождь": 7, "Гроза": 3 },
+        "Лето (JJA)": { "Ясно": 28, "Облачно": 45, "Туман": 5, "Лёгкий дождь": 12, "Сильный дождь": 6, "Гроза": 2 },
+        "Осень (SON)": { "Ясно": 20, "Облачно": 47, "Туман": 6, "Лёгкий дождь": 15, "Сильный дождь": 8, "Гроза": 3 }
+      }
+    },
+
+    // ── 4. Полярные восточные (>60°) ────────────────────────────────────────
+    "Полярные ветры (>60°)": {
+      seasons: ["Зима (DJF)", "Лето (JJA)"],
+      // E/NE dominant winter; E dominant summer; N, SE secondary
+      // [N, NE, E, SE, S, SW, W, NW]
+      directions: [10, 27, 28, 15, 5, 3, 3, 9],
+      windW: {
+        "Зима (DJF)": [8, 18, 35, 30, 9],
+        "Лето (JJA)": [15, 25, 40, 18, 2]
+      },
+      weatherW: {
+        // Дождь (20/15): лёгкий ~2/3, сильный ~1/3
+        "Зима (DJF)": { "Ясно": 15, "Облачно": 50, "Туман": 10, "Лёгкий дождь": 13, "Сильный дождь": 7, "Гроза": 2 },
+        "Лето (JJA)": { "Ясно": 25, "Облачно": 48, "Туман": 8, "Лёгкий дождь": 10, "Сильный дождь": 5, "Гроза": 1 }
+      }
+    }
   };
 
-  // Пересчёт вероятности погоды по времени суток (множители)
-  //    Утро: часто туман/рассеянная облачность; тихий ветер чаще.
-  //    День: больше ясных часов; в тёплый день вероятность грозы выше (особенно после полудня).
-  //    Вечер: охлаждение — туманы и облачность часто растёт.
-  //    Ночь: туман и ясность/звёздное небо, меньше гроз.
+  // ───────────────────────────────────────────────────────────────────────────
+  // 8 направлений (индекс = порядок в массиве directions)
+  // ───────────────────────────────────────────────────────────────────────────
+  const DIR_NAMES = [
+    { dir: "Северный", arrow: "↓" },
+    { dir: "Северо-восточный", arrow: "↙" },
+    { dir: "Восточный", arrow: "←" },
+    { dir: "Юго-восточный", arrow: "↖" },
+    { dir: "Южный", arrow: "↑" },
+    { dir: "Юго-западный", arrow: "↗" },
+    { dir: "Западный", arrow: "→" },
+    { dir: "Северо-западный", arrow: "↘" }
+  ];
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Шкала ветра — веса берутся из CLIMATE[zone].windW[season]
+  // ───────────────────────────────────────────────────────────────────────────
+  const WIND_DEFS = [
+    { range: "<5 уз.", label: "Штиль", waves: "0–0.5 м", icon: "🌫️", max: 1 },
+    { range: "5–10 уз.", label: "Лёгкий бриз", waves: "0.5–1 м", icon: "🍃", max: 2 },
+    { range: "10–20 уз.", label: "Свежий бриз", waves: "1–2 м", icon: "💨", max: 3 },
+    { range: "20–40 уз.", label: "Крепкий ветер", waves: "2–4 м", icon: "🌬️", max: 4 },
+    { range: ">40 уз.", label: "Шторм", waves: "4–8+ м", icon: "⛈️", max: 5 }
+  ];
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Множители погоды и ветра по времени суток
+  // ───────────────────────────────────────────────────────────────────────────
   const weatherByTime = {
-    "Утро":   { "Ясно":1.0,"Облачно":1.0,"Туман":2.5,"Лёгкий дождь":0.8,"Сильный дождь":0.4,"Гроза":0.1 },
-    "День":   { "Ясно":2.2,"Облачно":1.2,"Туман":0.2,"Лёгкий дождь":1.1,"Сильный дождь":0.6,"Гроза":1.8 },
-    "Вечер":  { "Ясно":1.1,"Облачно":1.3,"Туман":1.8,"Лёгкий дождь":1.1,"Сильный дождь":1.0,"Гроза":0.8 },
-    "Ночь":   { "Ясно":0.9,"Облачно":1.1,"Туман":2.2,"Лёгкий дождь":0.9,"Сильный дождь":0.6,"Гроза":0.3 }
+    "Утро": { "Ясно": 1.0, "Облачно": 1.0, "Туман": 2.5, "Лёгкий дождь": 0.8, "Сильный дождь": 0.4, "Гроза": 0.1 },
+    "День": { "Ясно": 2.2, "Облачно": 1.2, "Туман": 0.2, "Лёгкий дождь": 1.1, "Сильный дождь": 0.6, "Гроза": 1.8 },
+    "Вечер": { "Ясно": 1.1, "Облачно": 1.3, "Туман": 1.8, "Лёгкий дождь": 1.1, "Сильный дождь": 1.0, "Гроза": 0.8 },
+    "Ночь": { "Ясно": 0.9, "Облачно": 1.1, "Туман": 2.2, "Лёгкий дождь": 0.9, "Сильный дождь": 0.6, "Гроза": 0.3 }
   };
-
-  // Минимальная требуемая сила ветра (по шкале max в windTableF) для определённых погод,
-  //    чтобы избежать несовместимых сочетаний вроде "штиль + гроза".
-  //    Правила простые: гроза требует хотя бы свежего бриза (max >= 3), сильный дождь — min 2 и т.д.
+  const windModsByTime = {
+    "Утро": [2.0, 1.6, 1.0, 0.6, 0.2],
+    "День": [0.6, 0.9, 1.3, 1.6, 1.0],
+    "Вечер": [1.2, 1.4, 1.0, 0.8, 0.4],
+    "Ночь": [1.8, 1.2, 0.8, 0.5, 0.2]
+  };
   const weatherWindMin = {
-    "Ясно": 1,
-    "Облачно": 1,
-    "Туман": 1,
-    "Лёгкий дождь": 2,
-    "Сильный дождь": 3,
-    "Гроза": 3
+    "Ясно": 1, "Облачно": 1, "Туман": 1,
+    "Лёгкий дождь": 2, "Сильный дождь": 3, "Гроза": 3
+  };
+  const weatherDuration = {
+    "Ясно": { min: 4, max: 6 },
+    "Облачно": { min: 2, max: 6 },
+    "Туман": { min: 1, max: 6 },
+    "Лёгкий дождь": { min: 1, max: 6 },
+    "Сильный дождь": { min: 1, max: 6 },
+    "Гроза": { min: 1, max: 4 }
   };
 
-  // Длительность выпавшей погоды в часах — реалистичные диапазоны (рандомайзер)
-  //    — дневная ясная погода может держаться дольше; гроза обычно кратка (несколько часов).
-  const weatherDurationHours = {
-    "Ясно": { min:4, max:6 },
-    "Облачно": { min:2, max:6 },
-    "Туман": { min:1, max:6 },
-    "Лёгкий дождь": { min:1, max:6 },
-    "Сильный дождь": { min:1, max:6 },
-    "Гроза": { min:1, max:4 }
-  };
+  // ───────────────────────────────────────────────────────────────────────────
+  // Вспомогательные функции
+  // ───────────────────────────────────────────────────────────────────────────
+  function hourToCategory(h) {
+    if (h >= 6 && h < 12) return "Утро";
+    if (h >= 12 && h < 18) return "День";
+    if (h >= 18 && h < 21) return "Вечер";
+    return "Ночь";
+  }
+  function addHoursToHour(cur, dh) { return ((cur - 1 + dh) % 24) + 1; }
+  function fmtHour(h) { return String(h).padStart(2, "0") + ":00"; }
 
-  // Модификаторы ветра по времени (веса для windTableF элементов)
-  //    — оставлена исходная идея, немного подогнана для правдоподобия.
-  //    Формат: массив множителей длиной равно числу элементов windTableF.
-  const windModifiersByTime = {
-    "Утро":  [2.0,1.6,1.0,0.6,0.2],
-    "День":  [0.6,0.9,1.3,1.6,1.0],
-    "Вечер": [1.2,1.4,1.0,0.8,0.4],
-    "Ночь":  [1.8,1.2,0.8,0.5,0.2]
-  };
-
-  // Вспомогательная функция — взвешенный выбор из таблицы с полем weight
-  function weightedChoice(table) {
-    const total = table.reduce((a,b)=>a+(b.weight||0),0);
-    let roll = Math.random()*total, sum=0;
-    for (let e of table) { sum+=(e.weight||0); if (roll<=sum) return e; }
-    return table[0];
+  function weightedChoice(items) {
+    const total = items.reduce((s, e) => s + (e.weight || 0), 0);
+    if (total <= 0) return items[0];
+    let r = Math.random() * total, sum = 0;
+    for (const e of items) { sum += (e.weight || 0); if (r <= sum) return e; }
+    return items[0];
   }
 
-  // Генерация содержимого диалога
-  let content = `
-  <form>
-    <div style="margin-bottom:8px;">
-      <label><b>Выберите время суток:</b></label>
-      <select id="time" style="width:100%; color:black; background:white; margin-top:6px;">
-        ${timesOfDay.map(t=>`<option value="${t}">${t}</option>`).join("")}
-      </select>
-    </div>
-    <div style="margin-bottom:6px;">
-      <label><input type="checkbox" id="gmOnly"> Выводить только ГМ</label>
-    </div>
-  </form>`;
+  // ───────────────────────────────────────────────────────────────────────────
+  // Загружаем сохранённые настройки
+  // ───────────────────────────────────────────────────────────────────────────
+  const savedHour = game.user.getFlag(MODULE_ID, F_HOUR) || 12;
+  const zoneKeys = Object.keys(CLIMATE);
+  const savedZone = (game.user.getFlag(MODULE_ID, F_ZONE) || zoneKeys[0]);
+  const activeZone = CLIMATE[savedZone] ? savedZone : zoneKeys[0];
+  const savedSeason = (game.user.getFlag(MODULE_ID, F_SEASON) || CLIMATE[activeZone].seasons[0]);
+  const activeSeason = CLIMATE[activeZone].seasons.includes(savedSeason)
+    ? savedSeason
+    : CLIMATE[activeZone].seasons[0];
 
-  // Рендер диалога
+  // ───────────────────────────────────────────────────────────────────────────
+  // Построение HTML диалога
+  // ───────────────────────────────────────────────────────────────────────────
+  function buildZoneOptions(selected) {
+    return zoneKeys.map(z =>
+      "<option value=\"" + z + "\"" + (z === selected ? " selected" : "") + ">" + z + "</option>"
+    ).join("");
+  }
+
+  function buildSeasonOptions(zone, selected) {
+    return CLIMATE[zone].seasons.map(s =>
+      "<option value=\"" + s + "\"" + (s === selected ? " selected" : "") + ">" + s + "</option>"
+    ).join("");
+  }
+
+  function buildHourOptions(selected) {
+    return Array.from({ length: 24 }, (_, i) => {
+      const h = i + 1;
+      return "<option value=\"" + h + "\"" + (h === selected ? " selected" : "") + ">" + fmtHour(h) + "</option>";
+    }).join("");
+  }
+
+  const content =
+    "<form>" +
+
+    "<div style=\"margin-bottom:10px;\">" +
+    "<label style=\"display:block;margin-bottom:5px;\"><b>🗺️ Климатический пояс:</b></label>" +
+    "<select id=\"zone\" style=\"width:100%;padding:4px 8px;color:black;background:white;" +
+    "border:1px solid #aaa;border-radius:4px;font-size:14px;\">" +
+    buildZoneOptions(activeZone) +
+    "</select>" +
+    "</div>" +
+
+    "<div style=\"margin-bottom:10px;\">" +
+    "<label style=\"display:block;margin-bottom:5px;\"><b>🌿 Сезон:</b></label>" +
+    "<select id=\"season\" style=\"width:100%;padding:4px 8px;color:black;background:white;" +
+    "border:1px solid #aaa;border-radius:4px;font-size:14px;\">" +
+    buildSeasonOptions(activeZone, activeSeason) +
+    "</select>" +
+    "</div>" +
+
+    "<div style=\"margin-bottom:10px;\">" +
+    "<label style=\"display:block;margin-bottom:5px;\"><b>🕐 Текущий игровой час:</b></label>" +
+    "<select id=\"currentHour\" style=\"width:100%;padding:4px 8px;color:black;background:white;" +
+    "border:1px solid #aaa;border-radius:4px;font-size:14px;\">" +
+    buildHourOptions(savedHour) +
+    "</select>" +
+    "</div>" +
+
+    "<div style=\"margin-bottom:4px;\">" +
+    "<label><input type=\"checkbox\" id=\"gmOnly\"> Выводить только ГМ</label>" +
+    "</div>" +
+
+    "</form>";
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // Диалог
+  // ───────────────────────────────────────────────────────────────────────────
   new Dialog({
-    title: "🌊 Генератор морской погоды (Флеймрул)",
+    title: "🌊 Генератор морской погоды",
     content: content,
+
+    // При смене пояса — перестраиваем список сезонов
+    render: (html) => {
+      html.find("#zone").on("change", function () {
+        const z = this.value;
+        const seasons = CLIMATE[z] ? CLIMATE[z].seasons : [];
+        html.find("#season").html(
+          seasons.map(s => "<option value=\"" + s + "\">" + s + "</option>").join("")
+        );
+      });
+    },
+
     buttons: {
       ok: {
         label: "Сгенерировать",
         callback: async (html) => {
-          const time = html.find("#time").val();
+          const zone = html.find("#zone").val();
+          const season = html.find("#season").val();
+          const currentHour = parseInt(html.find("#currentHour").val(), 10) || savedHour;
+          const tod = hourToCategory(currentHour);
           const gmOnly = html.find("#gmOnly")[0].checked;
 
-          // Подготовка таблицы погод с учетом месячных весов и множителей по времени
-          let weightedWeatherTable = Object.entries(monthWeatherWeights).map(([cond, base]) => {
-            const mult = (weatherByTime[time] && weatherByTime[time][cond]) || 1;
-            return { cond, weight: Math.max(0.01, base * mult) }; // предотвращаем нулевые веса
+          // Сохраняем выбор
+          await Promise.all([
+            game.user.setFlag(MODULE_ID, F_ZONE, zone),
+            game.user.setFlag(MODULE_ID, F_SEASON, season)
+          ]);
+
+          const zData = CLIMATE[zone] || CLIMATE[zoneKeys[0]];
+
+          // Направления ветра с весами из текущего пояса
+          const windDirections = DIR_NAMES.map((d, i) => ({
+            ...d, weight: zData.directions[i] || 1
+          }));
+
+          // Шкала ветра с весами из текущего пояса+сезона
+          const wWeights = (zData.windW[season] || zData.windW[zData.seasons[0]]);
+          const windTableF = WIND_DEFS.map((d, i) => ({
+            ...d, weight: wWeights[i] || 0
+          }));
+
+          // Таблица погоды с весами из текущего пояса+сезона, с модификатором времени суток
+          const baseWeather = zData.weatherW[season] || zData.weatherW[zData.seasons[0]];
+          const weightedWeatherTable = Object.entries(baseWeather).map(([cond, base]) => {
+            const mult = (weatherByTime[tod] && weatherByTime[tod][cond]) || 1;
+            return { cond, weight: Math.max(0.01, base * mult) };
           });
 
-          // Выбор погоды — но учитываем совместимость с ветром; поэтому цикл: выбираем погоду, затем пытаемся подобрать ветер
-          // Если не удаётся за N попыток — делаем повторный выбор погоды.
+          // Генерация погоды + совместимый ветер
           const MAX_TRIES = 8;
           let chosen = null;
 
           for (let attempt = 0; attempt < MAX_TRIES && !chosen; attempt++) {
             const weatherPick = weightedChoice(weightedWeatherTable);
             const weatherCond = weatherPick.cond;
+            const reqMin = weatherWindMin[weatherCond] || 1;
 
-            // Вычисляем ограничение по ветру для этой погоды (min)
-            const requiredWindMin = weatherWindMin[weatherCond] || 1;
+            const windOpts = windTableF.filter(w => w.max >= reqMin);
+            const mods = windModsByTime[tod] || windModsByTime["День"];
+            const adjOpts = windOpts.map((w, i) => ({ ...w, weight: (w.weight || 1) * (mods[i] || 1) }));
 
-            // Формируем допустимые варианты ветра: сначала фильтруем windTableF по минимальным требованиям
-            let windOptions = windTableF.filter(w => w.max >= requiredWindMin);
-
-            // Также дополнительно фильтруем по weatherWindMax (раньше был mapping; мы оставляем логику простую — уже покрыто выше)
-            // Применяем суточные модификаторы к весам ветров
-            const mods = windModifiersByTime[time] || windModifiersByTime["День"];
-            let adjustedOptions = windOptions.map((w, i) => {
-              return { ...w, weight: (w.weight || 1) * (mods[i] || 1) };
-            });
-
-            // Выбираем направление (оно зависит от месячных/климатических весов — сохраняем)
-            let directionObj = weightedChoice(windDirections);
-            // Выбираем ветер
+            const directionObj = weightedChoice(windDirections);
             let wind = null;
-            // Попробуем несколько раз подобрать ветер (если из-за модификаторов некоторые веса очень малы)
             for (let i = 0; i < 6; i++) {
-              wind = weightedChoice(adjustedOptions);
-              // Дополнительная логика: не разрешать (штиль + гроза) — гроза требует хотя бы moderate ветер
-              if (weatherCond === "Гроза" && wind.max < 3) {
-                // не подходит — продолжим выбор ветра
-                continue;
-              }
-              // Для тумана — предпочитаем слабый ветер; если выбран сильный — отвергаем
+              wind = weightedChoice(adjOpts);
+              if (weatherCond === "Гроза" && wind.max < 3) continue;
               if (weatherCond === "Туман" && wind.max >= 4) continue;
-              // Если прошли все проверки — принимаем
               break;
             }
-
-            // Если в итоге ветер не определился (маловероятно) — переходим к следующей попытке по погоде
             if (!wind) continue;
 
-            // Всё ок — фиксируем выбор
             chosen = {
               weatherCond,
-              weatherLabel: {
+              weatherLabel: ({
                 "Ясно": "Ясно ☀️",
                 "Облачно": "Облачно ☁️",
                 "Туман": "Туман 🌫️",
                 "Лёгкий дождь": "Мелкий дождь 🌦️",
                 "Сильный дождь": "Сильный дождь 🌧️",
                 "Гроза": "Гроза ⛈️"
-              }[weatherCond] || weatherCond,
+              })[weatherCond] || weatherCond,
               wind,
               directionObj
             };
-          } // конец цикла попыток
+          }
 
-          // Если не удалось ничего выбрать (крайне маловероятно), то выберем самый вероятный погодный вариант простым способом
-          if (!chosen){
-            const fallback=weightedChoice(weightedWeatherTable);
-            chosen={
-              weatherCond:fallback.cond,
-              weatherLabel:fallback.cond,
-              wind:weightedChoice(windTableF),
-              directionObj:weightedChoice(windDirections)
+          // Запасной вариант
+          if (!chosen) {
+            const fb = weightedChoice(weightedWeatherTable);
+            chosen = {
+              weatherCond: fb.cond, weatherLabel: fb.cond,
+              wind: weightedChoice(windTableF),
+              directionObj: weightedChoice(windDirections)
             };
           }
 
-          // Рандомайзер длительности (часы) для выбранной погоды
-          const durRange=weatherDurationHours[chosen.weatherCond]||{min:1,max:6};
-          const durationHours=Math.floor(Math.random()*(durRange.max-durRange.min+1))+durRange.min;
+          // Длительность и следующий час
+          const dur = weatherDuration[chosen.weatherCond] || { min: 1, max: 6 };
+          const durationHours = Math.floor(Math.random() * (dur.max - dur.min + 1)) + dur.min;
+          const nextHour = addHoursToHour(currentHour, durationHours);
+          await game.user.setFlag(MODULE_ID, F_HOUR, nextHour);
 
-          // Формируем читаемое сообщение (HTML)
-          const arrow=chosen.directionObj.arrow||"→";
-          const arrowHtml=`<span style="font-size:22px; font-weight:700; display:inline-block; width:32px; text-align:center; transform:translateY(4px);">${arrow}</span>`;
+          const curLabel = fmtHour(currentHour);
+          const nextLabel = fmtHour(nextHour);
+          const arrow = chosen.directionObj.arrow || "→";
+          const arrowHtml = "<span style=\"font-size:22px;font-weight:700;display:inline-block;" +
+            "width:32px;text-align:center;transform:translateY(4px);\">" + arrow + "</span>";
 
-          const msg=`
-          <div style="background:linear-gradient(180deg,#0f1724,#11121a); color:#e6eef6; padding:14px; border-radius:12px; font-family:Inter, system-ui; border:1px solid rgba(160,180,200,0.06);">
-            <h2 style="margin:0 0 6px 0; font-size:18px; color:#9be7ff;">🌤️ Погода — ${months["F"]}</h2>
-            <div style="font-size:12px; color:#9aa7b2; margin-bottom:10px;">
-              Сгенерировано для: <b>${time}</b>
-            </div>
-            <hr style="border:none; height:1px; background:rgba(255,255,255,0.08); margin:8px 0 12px 0;">
-            <p style="margin:0 0 8px 0; font-size:14px;">
-              <b>🧭 Направление ветра:</br> ${arrowHtml}</br> <b style="color:#ffd380;">${chosen.directionObj.dir}</b>
-            </p>
-            <p style="margin:0 0 8px 0; font-size:15px;">
-              <b>🌦️ Условия:</b> ${chosen.weatherLabel}
-            </p>
-            <p style="margin:0 0 8px 0; font-size:14px;">
-              <b>💨 Ветер:</b> ${chosen.wind.icon} <b> ${chosen.wind.label}</br> (${chosen.wind.range})
-            </p>
-            <p style="margin:0 0 8px 0; font-size:14px;">
-              <b>🌊 Волны:</b> ${chosen.wind.waves}
-            </p>
-            <p style="margin:0; font-size:14px;">
-              <b>⏳ Длительность:</b> ${durationHours} ч.
-            </p>
-          </div>`;
+          const msg =
+            "<div style=\"background:linear-gradient(180deg,#0f1724,#11121a);color:#e6eef6;" +
+            "padding:14px;border-radius:12px;font-family:Inter,system-ui;" +
+            "border:1px solid rgba(160,180,200,0.06);\">" +
+            "<h2 style=\"margin:0 0 4px 0;font-size:18px;color:#9be7ff;\">🌤️ Погода — " + months["F"] + "</h2>" +
+            "<div style=\"font-size:11px;color:#9aa7b2;margin-bottom:10px;\">" +
+            zone + " · " + season + " · " + curLabel +
+            "</div>" +
+            "<hr style=\"border:none;height:1px;background:rgba(255,255,255,0.08);margin:8px 0 12px 0;\">" +
+            "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
+            "<b>🧭 Направление ветра:</b><br>" + arrowHtml + "<br>" +
+            "<b style=\"color:#ffd380;\">" + chosen.directionObj.dir + "</b>" +
+            "</p>" +
+            "<p style=\"margin:0 0 8px 0;font-size:15px;\">" +
+            "<b>🌦️ Условия:</b> " + chosen.weatherLabel +
+            "</p>" +
+            "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
+            "<b>💨 Ветер:</b> " + chosen.wind.icon + " <b>" + chosen.wind.label + "</b>" +
+            " (" + chosen.wind.range + ")" +
+            "</p>" +
+            "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
+            "<b>🌊 Волны:</b> " + chosen.wind.waves +
+            "</p>" +
+            "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
+            "<b>⏳ Длительность:</b> " + durationHours + " ч." +
+            "</p>" +
+            "<hr style=\"border:none;height:1px;background:rgba(255,255,255,0.08);margin:8px 0 10px 0;\">" +
+            "<p style=\"margin:0;font-size:13px;color:#ffd380;\">" +
+            "🔄 Следующая смена погоды: <b>" + nextLabel + "</b>" +
+            "</p>" +
+            "</div>";
 
           try {
-            if (gmOnly){
-              const gmIds=game.users.contents.filter(u=>u.isGM).map(u=>u.id);
-              if (gmIds.length){
-                await ChatMessage.create({content:msg, whisper:gmIds});
-              } else {
-                await ChatMessage.create({content:msg});
-              }
+            if (gmOnly) {
+              const gmIds = game.users.contents.filter(u => u.isGM).map(u => u.id);
+              await ChatMessage.create({ content: msg, whisper: gmIds.length ? gmIds : undefined });
             } else {
-              await ChatMessage.create({content:msg});
+              await ChatMessage.create({ content: msg });
             }
-          } catch (err){
-            console.error("Ошибка отправки сообщения погоды:",err);
-            ChatMessage.create({content:`<pre>Ошибка генерации: ${err}</pre>`});
+          } catch (err) {
+            console.error("Ошибка погоды:", err);
+            ChatMessage.create({ content: "<pre>Ошибка: " + err + "</pre>" });
           }
         }
       },
-      cancel:{label:"Отмена"}
+      cancel: { label: "Отмена" }
     },
-    default:"ok"
+    default: "ok"
   }).render(true);
 })();
