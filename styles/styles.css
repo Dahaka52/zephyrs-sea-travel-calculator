@@ -1,264 +1,444 @@
-/* === Zephyr global styles (applies to dialog + chat) === */
+/* ===================================================
+   Zephyr's Sea Travel Calculator — styles.css
+   =================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&display=swap');
+
+/* ── Внешний контейнер (добавляется через options.classes) ── */
 .zephyr-calculator {
   display: flex;
   flex-direction: column;
-  width: max-content; /* автоширина по контенту */
+  width: max-content;
   max-width: 90vw;
 }
 
-.zephyr-calculator .content {
-  flex: 0 0 auto; /* контент не растягивается */
-  margin-bottom: 10px; /* отступ до кнопок */
-}
-
-.zephyr-calculator .buttons {
-  flex: 0 0 auto; /* кнопки под контентом */
-  display: flex;
-  gap: 8px;
-  justify-content: flex-end; /* справа */
-}
-
-.zephyr-calculator h3 { color:#4fc3f7; margin:0 0 8px 0; }
-.zephyr-calculator .key { color:#4fc3f7; font-weight:700; }
-.zephyr-calculator .val { color:#ffffff; font-weight:700; }
-.zephyr-calculator small { color:#b0bec5; }
-.zephyr-calculator table td { color:#e6eef6; vertical-align: middle; }
-
-.zephyr-calculator select,
-.zephyr-calculator select option {
-  background-color: #522a13 !important;
-  color: #eaf6ff !important;
-}
-
-/* Checkbox styling */
-.zephyr-calculator input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  margin: 0;
-  accent-color: #522a13;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.10);
-  border-radius: 4px;
-  vertical-align: middle;
-}
-
-.zephyr-calculator input[type="checkbox"]::-moz-focus-inner { border: 0; padding: 0; }
-.zephyr-calculator input[type="checkbox"]:checked {
-  background-color: #4fc3f7 !important;
-  border-color: #2eaed6 !important;
-  color: #fff !important;
-}
-
-/* Dialog specific styles */
+/* ── Foundry window-content: сброс до прозрачного, flex-колонка ── */
 .zephyr-calculator .window-content {
-  background:
-    linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
-    url('modules/zephyrs-sea-travel-calculator/assets/sea-map.jpg') no-repeat center center !important;
-  background-size: cover !important;
-  backdrop-filter: blur(3px);
-  color: #f0e6d2 !important;
+  background: transparent !important;
   padding: 0 !important;
-  /* height: 100% — Foundry корректно ресайзит окно по вертикали */
   height: 100%;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   font-family: 'Cinzel', serif;
-  overflow: hidden;
+  color: #f0e6d2 !important;
+  position: relative;
 }
 
-.zephyr-calculator .calc-container {
-  background: rgba(0,0,20,0.4);
-  backdrop-filter: blur(3px);
-  padding: 14px;
+/* ── Фоновый div (внутри HTML, не затрагивает Foundry-элементы) ── */
+.zephyr-bg {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)),
+    url('modules/zephyrs-sea-travel-calculator/assets/sea-map.jpg');
+  background-size: cover;
+  background-position: center center;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+/* ── Основной контейнер поверх фона ── */
+.zephyr-calc-wrap {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  /* flex: 1 — растягивается на всю высоту window-content */
   flex: 1 1 auto;
   min-height: 0;
-  color: #f0e6d2;
-  /* overflow: hidden нужен чтобы flex-дети с min-height: 0 могли скроллиться */
   overflow: hidden;
 }
 
-.zephyr-calculator .calc-content {
-  /* flex: 1 + overflow-y: auto — скролл внутри при любом размере окна */
+/* ── Прокручиваемая область контента ── */
+.zephyr-scroll {
   flex: 1 1 auto;
   overflow-y: auto;
   min-height: 0;
-  margin-bottom: 10px;
-}
-
-.zephyr-calculator .dialog-buttons {
-  position: relative; /* не прилипает к низу окна */
-  bottom: auto;
-  background: rgba(0,0,20,0.4);
-  backdrop-filter: blur(3px);
-  color: #f0e6d2 !important;
-  padding: 10px;
+  padding: 12px 14px 8px;
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-  border-radius: 0 0 10px 10px;
-}
-
-.zephyr-calculator input,
-.zephyr-calculator select,
-.zephyr-calculator textarea {
-  background: rgba(0,0,50,0.3);
-  color: #f0e6d2;
-  border: 1px solid rgba(255,255,255,0.1);
-  padding: 6px 8px;
-  border-radius: 6px;
-  box-sizing: border-box;
-  -webkit-appearance: none;
-  appearance: none;
-  height: 36px;
-  line-height: 20px;
-  display: block;
-  font-family: 'Cinzel', serif;
-}
-
-.zephyr-calculator select option {
-  background-color: rgba(10,30,60,0.8);
-  color: #f0e6d2;
-}
-
-.zephyr-calculator .calc-row {
-  display: flex;
+  flex-direction: column;
   gap: 10px;
-  align-items: center;
-  margin: 8px 0;
+}
+/* Кастомный скролл */
+.zephyr-scroll::-webkit-scrollbar { width: 5px; }
+.zephyr-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 3px; }
+.zephyr-scroll::-webkit-scrollbar-thumb { background: rgba(79,195,247,0.35); border-radius: 3px; }
+
+/* ── Секции-карточки ── */
+.zephyr-section {
+  background: rgba(5, 15, 35, 0.62);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px 14px;
 }
 
-.zephyr-calculator .calc-label {
-  min-width: 140px;
-  font-size: 20px;
-  color: #e8d5b5; 
-}
-
-.zephyr-calculator .calc-control {
-  flex: 1;
-  max-width: 420px;
-}
-
-.zephyr-calculator .calc-inline-control {
+.zephyr-section__title {
+  font-family: 'Cinzel', serif;
+  font-size: 0.78em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #7ecfee;
+  margin: 0 0 10px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(126,207,238,0.2);
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.zephyr-calculator .calc-inline-note {
-  font-size: 1.2em;
-  color: #f0e6d2;
-}
-
-.zephyr-calculator .result-panel {
-  background: rgba(0,0,20,0.4);
-  padding: 8px;
-  border-radius: 8px;
-  margin-top: 10px;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+/* ── Строки полей ── */
+.calc-row {
+  display: flex;
   gap: 10px;
-  align-items: start;
-  font-size: 1.2em;
+  align-items: center;
+  margin: 6px 0;
 }
 
-.zephyr-calculator .result-card {
-  padding: 8px;
-  border-radius: 6px;
-  background: rgba(20,14,5,0.6);
-  box-shadow: 0 2px 8px rgba(82,42,19,0.5);
-}
-
-.zephyr-calculator .result-card .label {
+.calc-label {
+  min-width: 130px;
+  font-size: 0.85em;
   color: #d6c29e;
-  font-weight: 700;
-  margin-bottom: 4px;
+  font-family: 'Cinzel', serif;
 }
 
-.zephyr-calculator .result-card .value {
-  color: #7fe6ff;
-  font-weight: 800;
-  font-size: 1.2em;
+.calc-control {
+  flex: 1;
+  max-width: 380px;
+}
+
+/* ── Select / Input ── */
+.zephyr-calculator select,
+.zephyr-calculator textarea {
+  background: rgba(0,0,40,0.55) !important;
+  color: #f0e6d2 !important;
+  border: 1px solid rgba(255,255,255,0.12) !important;
+  padding: 5px 8px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 32px;
+  line-height: 20px;
+  display: block;
+  font-family: 'Cinzel', serif;
+  font-size: 0.82em;
+  width: 100%;
+}
+
+.zephyr-calculator select option {
+  background-color: #0a1e3c !important;
+  color: #f0e6d2 !important;
+}
+
+.zephyr-calculator input[type="number"] {
+  background: rgba(0,0,40,0.55);
+  color: #f0e6d2;
+  border: 1px solid rgba(255,255,255,0.12);
+  padding: 5px 8px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 32px;
+  line-height: 20px;
+  display: block;
+  font-family: 'Cinzel', serif;
+  font-size: 0.82em;
+}
+
+/* ── Checkbox ── */
+.zephyr-calculator input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  accent-color: #4fc3f7;
+  vertical-align: middle;
+  cursor: pointer;
+}
+
+.calc-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.calc-inline-note {
+  font-size: 0.82em;
+  color: #b0b8c8;
+}
+
+/* ══════════════════════════════════
+   КОМПАС КУРСОВ К ВЕТРУ
+   ══════════════════════════════════ */
+.wind-compass-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.wind-compass {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  margin: 0 auto;
+}
+
+/* SVG сектора внутри */
+.wind-compass svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.compass-sector {
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.compass-sector path {
+  fill: rgba(20, 60, 100, 0.45);
+  stroke: rgba(126,207,238,0.35);
+  stroke-width: 1.5;
+  transition: fill 0.15s;
+}
+.compass-sector:hover path {
+  fill: rgba(79,195,247,0.25);
+}
+.compass-sector.active path {
+  fill: rgba(79,195,247,0.45);
+  stroke: rgba(79,195,247,0.85);
+  stroke-width: 2;
+}
+
+.compass-sector text {
+  fill: #c8dde8;
+  font-size: 10px;
+  font-family: 'Cinzel', serif;
+  pointer-events: none;
+  text-anchor: middle;
+  dominant-baseline: middle;
+}
+.compass-sector.active text {
+  fill: #ffffff;
+  font-weight: 700;
+}
+
+/* Центральная иконка компаса */
+.compass-center {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: rgba(10,30,60,0.85);
+  border: 2px solid rgba(79,195,247,0.5);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Подпись активного курса под компасом */
+.compass-label {
+  font-size: 0.8em;
+  color: #9ecfee;
+  text-align: center;
+  min-height: 1.2em;
+  font-family: 'Cinzel', serif;
+}
+
+/* ══════════════════════════════════
+   КНОПКИ СИЛЫ ВЕТРА
+   ══════════════════════════════════ */
+.wind-btns {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.wind-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 10px;
+  background: rgba(20,50,80,0.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  color: #c0d0e0;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72em;
+  min-width: 62px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.wind-btn:hover {
+  background: rgba(79,195,247,0.2);
+  border-color: rgba(79,195,247,0.4);
+}
+.wind-btn.active {
+  background: rgba(79,195,247,0.3);
+  border-color: rgba(79,195,247,0.75);
+  color: #ffffff;
+}
+.wind-btn .wbtn-icon { font-size: 1.5em; line-height: 1; }
+.wind-btn .wbtn-label { text-align: center; line-height: 1.2; }
+
+/* ══════════════════════════════════
+   КНОПКИ ВОЛНЕНИЯ
+   ══════════════════════════════════ */
+.wave-btns {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.wave-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 10px;
+  background: rgba(10,30,60,0.5);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  color: #c0d0e0;
+  font-family: 'Cinzel', serif;
+  font-size: 0.72em;
+  min-width: 62px;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+.wave-btn:hover {
+  background: rgba(79,195,247,0.15);
+  border-color: rgba(79,195,247,0.35);
+}
+.wave-btn.active {
+  background: rgba(79,195,247,0.25);
+  border-color: rgba(79,195,247,0.7);
+  color: #ffffff;
+}
+.wave-btn .wbtn-icon { font-size: 1.5em; line-height: 1; }
+.wave-btn .wbtn-label { text-align: center; line-height: 1.2; }
+
+/* ══════════════════════════════════
+   СЛАЙДЕР ГРУЗА
+   ══════════════════════════════════ */
+.cargo-slider {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 
 .zephyr-calculator input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   width: 100%;
-  height: 8px;
-  background: rgba(255,255,255,0.06);
-  border-radius: 6px;
+  height: 6px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
   outline: none;
+  border: none;
 }
-
 .zephyr-calculator input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   width: 16px; height: 16px;
   border-radius: 50%;
   background: #4fc3f7;
-  border: 2px solid rgba(255,255,255,0.85);
-  box-shadow: 0 0 10px rgba(79,195,247,0.6);
+  border: 2px solid rgba(255,255,255,0.8);
+  box-shadow: 0 0 8px rgba(79,195,247,0.6);
+  cursor: pointer;
 }
 
-.zephyr-calculator .cargo-slider {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.zephyr-calculator .cargo-value {
-  min-width: 76px;
+.cargo-value {
+  min-width: 70px;
   text-align: center;
   font-weight: 700;
-  color: #f0e6d2;
+  color: #7fe6ff;
+  font-size: 0.9em;
 }
 
-/* Collapsible elements */
-.zephyr-calculator details,
-.zephyr-calculator summary,
-.zephyr-calculator .collapse,
-.zephyr-calculator .spoiler,
-.zephyr-calculator .spoiler-content {
-  background: transparent;
-  color: #ba823d;
-}
-
-.zephyr-calculator summary {
-  display: flex;
-  align-items: center;
+/* ══════════════════════════════════
+   БЛОК РЕЗУЛЬТАТОВ
+   ══════════════════════════════════ */
+.result-panel {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 8px;
-  padding: 6px 8px;
-  cursor: pointer;
-  border-radius: 6px;
 }
 
-.zephyr-calculator summary:hover {
-  background: rgba(255,255,255,0.02);
+.result-card {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(10,20,40,0.7);
+  border: 1px solid rgba(79,195,247,0.15);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
-.zephyr-calculator details[open] > *:not(summary),
-.zephyr-calculator .collapse.open,
-.zephyr-calculator .spoiler.open,
-.zephyr-calculator .spoiler-content.open {
-  background: rgba(168, 121, 56,0.03);
-  padding: 8px;
-  border-radius: 6px;
-  color: #b8905c;
+.result-card .label {
+  color: #8ab0c8;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 2px;
 }
 
-.zephyr-calculator .condition-item,
-.zephyr-calculator .condition-description {
-  background: rgba(255,255,255,0.02);
-  color: #ba823d;
-  padding: 6px;
-  border-radius: 4px;
+.result-card .value {
+  color: #7fe6ff;
+  font-weight: 800;
+  font-size: 1.1em;
 }
 
-/* Chat styles */
+.result-card .sub {
+  color: #8ab0c8;
+  font-size: 0.8em;
+  margin-top: 1px;
+}
+
+/* ── Кнопки диалога Foundry ── */
+.zephyr-calculator .dialog-buttons {
+  position: relative !important;
+  flex-shrink: 0;
+  background: rgba(5,10,25,0.75) !important;
+  backdrop-filter: blur(6px);
+  color: #f0e6d2 !important;
+  padding: 8px 14px !important;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  border-radius: 0 0 6px 6px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  z-index: 1;
+}
+
+/* ── Ship info ── */
+.ship-info {
+  font-size: 0.78em;
+  color: #9aaec0;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+/* ── Прочее ── */
+.zephyr-calculator h3 { color:#4fc3f7; margin:0 0 8px 0; }
+.zephyr-calculator .key { color:#4fc3f7; font-weight:700; }
+.zephyr-calculator .val { color:#ffffff; font-weight:700; }
+.zephyr-calculator small { color:#b0bec5; }
+.zephyr-calculator table td { color:#e6eef6; vertical-align: middle; }
+
+/* ═══════════════════════════════════
+   ЧАТ-КАРТОЧКА
+   ═══════════════════════════════════ */
 .zephyr-chat {
-  background: url("modules/zephyrs-sea-travel-calculator/assets/sea-map.jpg") center/cover no-repeat;
+  background:
+    url("modules/zephyrs-sea-travel-calculator/assets/sea-map.jpg") center/cover no-repeat;
   color: #072033;
   font-family: "Cinzel", serif;
   font-size: 1.3em;
@@ -287,16 +467,9 @@
 }
 
 /* Responsive */
-@media (max-width:700px) {
-  .zephyr-calculator .result-panel {
-    grid-template-columns: 1fr;
-  }
-  .zephyr-calculator .calc-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-  .zephyr-calculator .calc-label {
-    min-width: auto;
-    margin-bottom: 6px;
-  }
+@media (max-width: 600px) {
+  .result-panel { grid-template-columns: 1fr; }
+  .wind-btns, .wave-btns { gap: 4px; }
+  .wind-btn, .wave-btn { min-width: 52px; padding: 5px 7px; }
 }
+
