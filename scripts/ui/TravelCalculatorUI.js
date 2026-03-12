@@ -322,7 +322,7 @@ class TravelCalculatorUI {
       `<option value="${k}" ${data.crewType === k ? "selected" : ""}>${c.label}</option>`
     ).join("");
 
-    // ── Кнопки ветра (5 шт) ── (данные из макроса)
+    // ── Кнопки ветра + волнения (связанные) ──
     const windData = [
       { id: "calm", icon: "🌫️", label: "Штиль", sub: "<5 уз." },
       { id: "weak", icon: "🍃", label: "Бриз", sub: "5-10 уз." },
@@ -330,15 +330,7 @@ class TravelCalculatorUI {
       { id: "strong", icon: "🌬️", label: "Крепкий", sub: "20-40 уз." },
       { id: "storm", icon: "⛈️", label: "Шторм", sub: ">40 уз." }
     ];
-    const windBtns = windData.map(w =>
-      `<div class="wbtn ${data.windForce === w.id ? "active" : ""}" data-target="windForce" data-val="${w.id}">
-         <div class="wbtn-icon">${w.icon}</div>
-         <div class="wbtn-label">${w.label}</div>
-         <div class="wbtn-sub">${w.sub}</div>
-       </div>`
-    ).join("");
 
-    // ── Кнопки волнения (5 шт) ── (данные из макроса)
     const waveData = [
       { id: "calm", icon: "〰️", label: "Штиль", sub: "0-0.5 м" },
       { id: "ripple", icon: "🌊", label: "Рябь", sub: "0.5-1 м" },
@@ -346,13 +338,19 @@ class TravelCalculatorUI {
       { id: "stwave", icon: "🌊🌊🌊", label: "Шторм", sub: "2-4 м" },
       { id: "storm", icon: "🌀", label: "Ураган", sub: "4-8+ м" }
     ];
-    const waveBtns = waveData.map(w =>
-      `<div class="wbtn ${data.waves === w.id ? "active" : ""}" data-target="waves" data-val="${w.id}">
-         <div class="wbtn-icon">${w.icon}</div>
-         <div class="wbtn-label">${w.label}</div>
-         <div class="wbtn-sub">${w.sub}</div>
-       </div>`
-    ).join("");
+
+    const windToWaveMap = { calm: "calm", weak: "ripple", normal: "wave", strong: "stwave", storm: "storm" };
+    const derivedWaves = windToWaveMap[data.windForce] || data.waves || "calm";
+    const windSeaBtns = windData.map(w => {
+      const waveId = windToWaveMap[w.id] || "calm";
+      const wave = waveData.find(entry => entry.id === waveId) || waveData[0];
+      return `<div class="wbtn wbtn--windsea windsea-btn ${data.windForce === w.id ? "active" : ""}" data-wind="${w.id}" data-wave="${waveId}">
+        <div class="wbtn-icon">${w.icon}<span class="wbtn-icon-wave">${wave.icon}</span></div>
+        <div class="wbtn-label">${w.label}</div>
+        <div class="wbtn-sub">${w.sub}</div>
+        <div class="wbtn-wave">Волны: ${wave.sub}</div>
+      </div>`;
+    }).join("");
 
     return `
 <div class="zephyr-bg"></div>
@@ -361,7 +359,7 @@ class TravelCalculatorUI {
     <div class="zephyr-layout-cols">
 
       <!-- ═══ ЛЕВАЯ КОЛОНКА: КОРАБЛЬ ═══ -->
-      <div>
+      <div class="zephyr-col">
         <div class="zephyr-section">
           <div class="zephyr-section__title">⚙️ Параметры корабля</div>
 
@@ -408,7 +406,7 @@ class TravelCalculatorUI {
       </div>
 
       <!-- ═══ ПРАВАЯ КОЛОНКА: НАВИГАЦИЯ ═══ -->
-      <div>
+      <div class="zephyr-col">
         <div class="zephyr-section">
           <div class="zephyr-section__title">🧭 Навигация и Погода</div>
 
@@ -463,13 +461,10 @@ class TravelCalculatorUI {
             </div>
           </div>
 
-          <div style="font-size:0.9em; font-weight:bold; color:#dcb881; margin:8px 0 4px 0;">Сила ветра</div>
-          <div class="wbtn-group">${windBtns}</div>
+          <div style="font-size:0.9em; font-weight:bold; color:#dcb881; margin:8px 0 4px 0;">Ветер и волны</div>
+          <div class="wbtn-group windsea-group">${windSeaBtns}</div>
           <input type="hidden" id="windForce" value="${data.windForce}"/>
-
-          <div style="font-size:0.9em; font-weight:bold; color:#dcb881; margin:8px 0 4px 0;">Волнение моря</div>
-          <div class="wbtn-group">${waveBtns}</div>
-          <input type="hidden" id="waves" value="${data.waves}"/>
+          <input type="hidden" id="waves" value="${derivedWaves}"/>
 
         </div>
       </div>
@@ -480,14 +475,9 @@ class TravelCalculatorUI {
     <div class="zephyr-results zephyr-section">
       <div id="calcResult" class="result-panel">
         <div class="result-card">
-          <div class="label">Скорость</div>
-          <div class="value" id="res-speed">—</div>
-          <div class="sub" id="res-ft">—</div>
-        </div>
-        <div class="result-card">
-          <div class="label">Пройдено / Затрачено</div>
-          <div class="value" id="res-dist">—</div>
-          <div class="sub" id="res-extra">—</div>
+          <div class="label">Загрузка / Экипаж</div>
+          <div class="value" id="res-cargo">—</div>
+          <div class="sub" id="res-crew">—</div>
         </div>
         <div class="result-card">
           <div class="label">Манёвренность</div>
@@ -495,9 +485,14 @@ class TravelCalculatorUI {
           <div class="sub" id="res-radius">—</div>
         </div>
         <div class="result-card">
-          <div class="label">Загрузка / Экипаж</div>
-          <div class="value" id="res-cargo">—</div>
-          <div class="sub" id="res-crew">—</div>
+          <div class="label">Пройдено / Затрачено</div>
+          <div class="value" id="res-dist">—</div>
+          <div class="sub" id="res-extra">—</div>
+        </div>
+        <div class="result-card">
+          <div class="label">Скорость</div>
+          <div class="value" id="res-speed">—</div>
+          <div class="sub" id="res-ft">—</div>
         </div>
       </div>
     </div>
@@ -535,31 +530,19 @@ class TravelCalculatorUI {
       recalcAndQueueSave();
     });
 
-    // ── Кнопки ветра/волн (универсальный делегат) ──────────────────
-    html.on("click", ".wbtn", (e) => {
+    // ── Кнопки ветра + волн (связанные) ─────────────────────────────
+    html.on("click", ".windsea-btn", (e) => {
       const btn = $(e.currentTarget);
-      const targetId = btn.data("target");
-      const val = btn.data("val");
-      if (!targetId || !val) return;
+      const windVal = btn.data("wind");
+      const waveVal = btn.data("wave");
+      if (!windVal || !waveVal) return;
 
-      // Обновляем скрытый инпут
-      html.find(`#${targetId}`).val(val);
-      
-      // Визуально переключаем класс
-      btn.siblings().removeClass("active");
+      html.find("#windForce").val(windVal);
+      html.find("#waves").val(waveVal);
+
+      btn.siblings(".windsea-btn").removeClass("active");
       btn.addClass("active");
 
-      // Если изменили ветер — автоприменяем волны (если не шторм вручную)
-      if (targetId === "windForce") {
-        const autoWave = { calm: "calm", weak: "ripple", normal: "wave", strong: "stwave", storm: "storm" };
-        const newWave = autoWave[val];
-        if (newWave) {
-          html.find("#waves").val(newWave);
-          const waveBtns = html.find(`.wbtn[data-target="waves"]`);
-          waveBtns.removeClass("active");
-          waveBtns.filter(`[data-val="${newWave}"]`).addClass("active");
-        }
-      }
       recalcAndQueueSave();
     });
 
@@ -707,12 +690,12 @@ class TravelCalculatorUI {
       html.find("#res-dist").text(`${data.distance} ${data.unit === "km" ? "км" : "миль"}`);
       html.find("#res-extra").text(`${result.time.days}д ${result.time.hours}ч ${result.time.minutes}м`);
     } else {
-      html.find("#res-dist").text(`${result.timeHours} ч.`);
-      html.find("#res-extra").text(`${result.distanceKm.toFixed(1)} км / ${result.distanceMi.toFixed(1)} миль`);
+      html.find("#res-dist").text(`${result.distanceKm.toFixed(1)} км / ${result.distanceMi.toFixed(1)} миль`);
+      html.find("#res-extra").text(`${result.timeHours} ч.`);
     }
 
-    html.find("#res-mano").text(`${(result.shipState.maneuverability * 100).toFixed(0)}%`);
-    html.find("#res-radius").text(`≈ ${Math.round(result.shipState.turnRadiusFt)} фт`);
+    html.find("#res-mano").text(`≈ ${Math.round(result.shipState.turnRadiusFt)} фт`);
+    html.find("#res-radius").text(`${(result.shipState.maneuverability * 100).toFixed(0)}%`);
     html.find("#res-cargo").text(`${result.shipState.effectiveCargo.toFixed(2)} т / ${this.getShipMaxCargo(data.ship)} т`);
     html.find("#res-crew").text(`${data.crewCount} чел (≈ ${result.shipState.crewWeightTons.toFixed(2)} т)`);
   }

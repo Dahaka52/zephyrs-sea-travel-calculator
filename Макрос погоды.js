@@ -371,11 +371,8 @@
             "<b>🌦️ Условия:</b> " + chosen.weatherLabel +
             "</p>" +
             "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
-            "<b>💨 Ветер:</b> " + chosen.wind.icon + " <b>" + chosen.wind.label + "</b>" +
-            " (" + chosen.wind.range + ")" +
-            "</p>" +
-            "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
-            "<b>🌊 Волны:</b> " + chosen.wind.waves +
+            "<b>💨 Ветер и волны:</b> " + chosen.wind.icon + " <b>" + chosen.wind.label + "</b>" +
+            " (" + chosen.wind.range + "), " + chosen.wind.waves +
             "</p>" +
             "<p style=\"margin:0 0 8px 0;font-size:14px;\">" +
             "<b>⏳ Длительность:</b> " + durationHours + " ч." +

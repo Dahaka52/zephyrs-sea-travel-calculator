@@ -232,8 +232,7 @@ var ZEPHYR_WEATHER_MACRO_COMMAND = `
             "<hr style=\\"border:none;height:1px;background:rgba(255,255,255,0.08);margin:8px 0 12px 0;\\">"+
             "<p style=\\"margin:0 0 8px 0;font-size:14px;\\"><b>🧭 Направление ветра:</b><br>"+arrowHtml+"<br><b style=\\"color:#ffd380;\\">"+chosen.directionObj.dir+"</b></p>"+
             "<p style=\\"margin:0 0 8px 0;font-size:15px;\\"><b>🌦️ Условия:</b> "+chosen.weatherLabel+"</p>"+
-            "<p style=\\"margin:0 0 8px 0;font-size:14px;\\"><b>💨 Ветер:</b> "+chosen.wind.icon+" <b>"+chosen.wind.label+"</b> ("+chosen.wind.range+")</p>"+
-            "<p style=\\"margin:0 0 8px 0;font-size:14px;\\"><b>🌊 Волны:</b> "+chosen.wind.waves+"</p>"+
+            "<p style=\\"margin:0 0 8px 0;font-size:14px;\\"><b>💨 Ветер и волны:</b> "+chosen.wind.icon+" <b>"+chosen.wind.label+"</b> ("+chosen.wind.range+"), "+chosen.wind.waves+"</p>"+
             "<p style=\\"margin:0 0 8px 0;font-size:14px;\\"><b>⏳ Длительность:</b> "+durationHours+" ч.</p>"+
             "<hr style=\\"border:none;height:1px;background:rgba(255,255,255,0.08);margin:8px 0 10px 0;\\">"+
             "<p style=\\"margin:0;font-size:13px;color:#ffd380;\\">🔄 Следующая смена погоды: <b>"+nextLabel+"</b></p>"+
