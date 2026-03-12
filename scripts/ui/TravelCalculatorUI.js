@@ -64,23 +64,8 @@ class TravelCalculatorUI {
     this.dialog = new Dialog({
       title: "🧭 Калькулятор морского перехода",
       content,
-      buttons: {
-        calculate: {
-          label: "<i class='fas fa-ship'></i> Рассчитать и отправить в чат",
-          callback: html => {
-            this.calculateAndSend(html);
-            return false;
-          }
-        },
-        close: {
-          label: "<i class='fas fa-times'></i> Закрыть",
-          callback: () => {
-            if (this.dialog) this.dialog.close();
-          }
-        }
-      },
+      buttons: {},
       render: html => this.initializeEventHandlers(html),
-      default: "calculate",
       close: () => this.closeDialog()
     }, options);
 
@@ -345,7 +330,7 @@ class TravelCalculatorUI {
       const waveId = windToWaveMap[w.id] || "calm";
       const wave = waveData.find(entry => entry.id === waveId) || waveData[0];
       return `<div class="wbtn wbtn--windsea windsea-btn ${data.windForce === w.id ? "active" : ""}" data-wind="${w.id}" data-wave="${waveId}">
-        <div class="wbtn-icon">${w.icon}<span class="wbtn-icon-wave">${wave.icon}</span></div>
+        <div class="wbtn-icon">${w.icon}</div>
         <div class="wbtn-label">${w.label}</div>
         <div class="wbtn-sub">${w.sub}</div>
         <div class="wbtn-wave">Волны: ${wave.sub}</div>
@@ -443,7 +428,7 @@ class TravelCalculatorUI {
           </div>
 
           <div class="compass-container">
-            <div style="font-size:0.85em; color:#a89475; margin-bottom:4px; text-align:center;">Внешний круг: Ветер. Внутренний: Движение.</div>
+            <div class="compass-hint">Внешний круг: Ветер. Внутренний: Движение.</div>
             <div id="compassRenderArea">
               ${this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir)}
             </div>
@@ -470,6 +455,12 @@ class TravelCalculatorUI {
       </div>
 
     </div> <!-- End Columns Layout -->
+
+    <div class="calc-actions">
+      <button type="button" class="zephyr-action-btn" id="sendToChat">
+        <i class='fas fa-ship'></i> Рассчитать и отправить в чат
+      </button>
+    </div>
 
     <!-- ═══ СЕКЦИЯ РЕЗУЛЬТАТОВ (На всю ширину внизу) ═══ -->
     <div class="zephyr-results zephyr-section">
@@ -528,6 +519,10 @@ class TravelCalculatorUI {
       compassArea.html(this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir));
       
       recalcAndQueueSave();
+    });
+
+    html.find("#sendToChat").on("click", () => {
+      this.calculateAndSend(html);
     });
 
     // ── Кнопки ветра + волн (связанные) ─────────────────────────────
