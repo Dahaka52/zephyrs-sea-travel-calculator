@@ -48,13 +48,13 @@
   overflow-y: auto;
   padding: 12px;
   color: #e8d5b5; /* Beige text */
-  font-size: 1.15em;
+  font-size: 1.2em;
 }
 
 /* 2 Columns Layout (Grid) */
 .zephyr-layout-cols {
   display: grid;
-  grid-template-columns: 1fr 1.1fr; /* Правая чуть шире под компас */
+  grid-template-columns: 1fr 1fr;
   gap: 16px;
   align-items: stretch;
   margin-bottom: 16px;
@@ -237,12 +237,12 @@
   margin-bottom: 2px;
 }
 .wbtn-label {
-  font-size: 1em;
+  font-size: 1.05em;
   font-weight: bold;
   white-space: nowrap;
 }
 .wbtn-sub {
-  font-size: 0.95em;
+  font-size: 1em;
   opacity: 0.85;
 }
 .wbtn:hover {
@@ -268,7 +268,7 @@
 }
 
 .wbtn--windsea .wbtn-wave {
-  font-size: 0.9em;
+  font-size: 0.95em;
   color: #b7a98e;
   margin-top: 2px;
   line-height: 1.1;
@@ -316,21 +316,21 @@
 }
 
 .compass-hint {
-  font-size: 1.1em;
+  font-size: 1.15em;
   color: #a89475;
   margin-bottom: 4px;
   text-align: center;
 }
 
 .course-line {
-  font-size: 1.1em;
+  font-size: 1.15em;
   margin-top: 6px;
   color: #dcb881;
   font-weight: bold;
 }
 
 .section-subtitle {
-  font-size: 1.1em;
+  font-size: 1.15em;
   font-weight: bold;
   color: #dcb881;
   margin: 8px 0 4px 0;
@@ -383,7 +383,7 @@
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
 }
 .result-card .label {
-  font-size: 1.05em;
+  font-size: 1.1em;
   color: #b8905c;
   margin-bottom: 4px;
 }
@@ -393,7 +393,7 @@
   color: #dcb881;
 }
 .result-card .sub {
-  font-size: 1.05em;
+  font-size: 1.1em;
   color: #8c7a61;
 }
 
@@ -403,6 +403,6 @@
   border-left: 3px solid #b8905c;
   padding: 10px;
   margin-bottom: 12px;
-  font-size: 1.05em;
+  font-size: 1.1em;
   color: #dcd0b3;
 }

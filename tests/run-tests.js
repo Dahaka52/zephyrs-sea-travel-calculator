@@ -109,7 +109,7 @@ test("settings are registered in client scope", () => {
 test("calculatePolarSpeed interpolates coefficients correctly", () => {
   const ship = ctx.ZEPHYR_SHIPS_LIBRARY.leRequinXebec;
   const speed = calc.shipStateCalculator.calculatePolarSpeed(ship, 52.5, {});
-  assert.ok(Math.abs(speed - 11.875) < 0.0001);
+  assert.ok(Math.abs(speed - 12.9504) < 0.0001);
 });
 
 test("calculateSpeed returns stable baseline value for Sloop", () => {

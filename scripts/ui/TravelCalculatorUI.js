@@ -42,7 +42,7 @@ class TravelCalculatorUI {
     const content = this.createDialogContent(data);
     const defaults = (typeof this.calculator.getDefaultWindowSettings === "function")
       ? this.calculator.getDefaultWindowSettings()
-      : { width: 980, height: 750, top: null, left: null };
+      : { width: 1120, height: 760, top: null, left: null };
     const ws = { ...defaults, ...(this.calculator.windowSettings || {}) };
     const options = {
       width: ws.width || defaults.width,
@@ -158,6 +158,18 @@ class TravelCalculatorUI {
     this.dialog = null;
   }
 
+  applyMinWindowHeight() {
+    const dialogElement = this.getDialogElement();
+    if (!dialogElement) return;
+    const scrollEl = dialogElement.querySelector(".zephyr-scroll");
+    const headerEl = dialogElement.querySelector(".window-header");
+    if (!scrollEl) return;
+    const headerH = headerEl ? headerEl.getBoundingClientRect().height : 0;
+    const contentH = scrollEl.scrollHeight + 24;
+    const minH = Math.ceil(headerH + contentH);
+    dialogElement.style.minHeight = `${minH}px`;
+  }
+
   getAvailableBonusSails(shipId) {
     return this.calculator.getAvailableBonusSails(shipId);
   }
@@ -208,7 +220,7 @@ class TravelCalculatorUI {
   // Отрисовка двухслойной розы ветров
   _buildDualCompassSVG(windDir, shipDir) {
     const cx = 110, cy = 110;
-    const outerR = 100, innerR = 65, centerR = 30;
+    const outerR = 100, innerR = 70, centerR = 18;
 
     const windDirs = [
       { a: 0, label: "N" }, { a: 45, label: "NE" }, { a: 90, label: "E" }, { a: 135, label: "SE" },
@@ -262,28 +274,34 @@ class TravelCalculatorUI {
 
     // Рисуем стрелку ветра (откуда дует)
     // Ветер N (0) дует С СЕВЕРА НА ЮГ. Угол стрелки = windDir + 180
-    const wArrowAngle = (windDir + 180) % 360;
-    const wArrowTail = polarToXY(windDir, outerR - 5);
-    const wArrowHead = polarToXY(windDir, centerR + 5);
+    const wArrowTail = polarToXY(windDir, outerR + 8);
+    const wArrowHead = polarToXY(windDir, innerR + 6);
 
     // Рисуем стрелку корабля (куда плывет)
-    const sArrowHead = polarToXY(shipDir, innerR - 5);
-    const sArrowTail = polarToXY((shipDir + 180) % 360, centerR + 5);
+    const sArrowHead = polarToXY(shipDir, innerR - 6);
+    const sArrowTail = polarToXY(shipDir, centerR + 2);
 
     return `
       <div class="compass-wrapper">
         <svg class="compass-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="zephyr-wind-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L6,3 L0,6 Z" fill="#9ff0ff"/>
+            </marker>
+            <marker id="zephyr-ship-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#ffb24a"/>
+            </marker>
+          </defs>
           <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="rgba(10,5,0,0.5)" stroke="#dcb881" stroke-width="2"/>
           ${outerRing}
           ${innerRing}
           <circle cx="${cx}" cy="${cy}" r="${centerR}" fill="#2a1c14" stroke="#dcb881" stroke-width="1"/>
           
           <!-- Ship Arrow -->
-          <line class="compass-arrow compass-arrow--ship" x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#dcb881" stroke-width="4" stroke-linecap="round"/>
-          <circle class="compass-arrow-head compass-arrow-head--ship" cx="${sArrowHead.x}" cy="${sArrowHead.y}" r="4" fill="#ffb24a"/>
+          <line class="compass-arrow compass-arrow--ship" x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#dcb881" stroke-width="4" stroke-linecap="round" marker-end="url(#zephyr-ship-arrow)"/>
 
           <!-- Wind Arrow -->
-          <line class="compass-arrow compass-arrow--wind" x1="${wArrowTail.x}" y1="${wArrowTail.y}" x2="${wArrowHead.x}" y2="${wArrowHead.y}" stroke="#9ff0ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="5,3"/>
+          <line class="compass-arrow compass-arrow--wind" x1="${wArrowTail.x}" y1="${wArrowTail.y}" x2="${wArrowHead.x}" y2="${wArrowHead.y}" stroke="#9ff0ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="5,3" marker-end="url(#zephyr-wind-arrow)"/>
           
           <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="12" fill="#dcb881">🧭</text>
         </svg>
@@ -505,6 +523,7 @@ class TravelCalculatorUI {
     const recalcAndQueueSave = () => {
       this.calculate(html);
       this.scheduleSave(html);
+      this.applyMinWindowHeight();
     };
 
     // ── Компас (Клик по внешнему/внутреннему кругу) ────────────────
@@ -582,12 +601,14 @@ class TravelCalculatorUI {
     this.updateMode(html);
     this.updateCargoLimits(html);
     this.calculate(html);
+    setTimeout(() => this.applyMinWindowHeight(), 0);
   }
 
   updateMode(html) {
     const mode = html.find("#mode").val();
     html.find(".mode-distance").toggle(mode === "distance");
     html.find(".mode-time").toggle(mode === "time");
+    this.applyMinWindowHeight();
   }
 
   updateShip(html) {
@@ -616,6 +637,7 @@ class TravelCalculatorUI {
 
     this.updateCargoLimits(html);
     this.updateShipInfo(html);
+    this.applyMinWindowHeight();
   }
 
   updateCargoLimits(html) {
@@ -642,6 +664,7 @@ class TravelCalculatorUI {
       cargoEl.prop("disabled", false);
       html.find("#cargoValue").text(`${cargoVal.toFixed(1)} т`);
     }
+    this.applyMinWindowHeight();
   }
 
   updateShipInfo(html) {
