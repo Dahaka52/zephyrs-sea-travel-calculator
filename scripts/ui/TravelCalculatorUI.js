@@ -11,6 +11,12 @@ class TravelCalculatorUI {
 
     this.trackedWindowElement = null;
     this.onWindowMouseUp = null;
+
+    // Внутреннее состояние компаса для UI (8 румбов)
+    this.uiState = {
+      windDir: 0,   // Направление ветра (0=N, 45=NE ... 315=NW)
+      shipDir: 90   // Направление движения корабля
+    };
   }
 
   getDialogElement() {
@@ -24,11 +30,17 @@ class TravelCalculatorUI {
       return;
     }
 
-    const content = this.createDialogContent();
-    const ws = this.calculator.windowSettings || { width: 680, height: 700, top: null, left: null };
+    // Инициализируем uiState из lastData (или по умолчанию)
+    const data = this.calculator.normalizeInput(this.calculator.lastData || {});
+    // Попытка восстановить направления (если они были сохранены в data, для обратной совместимости ставим дефолт)
+    this.uiState.windDir = data.windDir ?? 0;
+    this.uiState.shipDir = data.shipDir ?? 90;
+
+    const content = this.createDialogContent(data);
+    const ws = this.calculator.windowSettings || { width: 850, height: 750, top: null, left: null };
     const options = {
-      width: ws.width || 680,
-      height: ws.height || 700,
+      width: ws.width || 850,
+      height: ws.height || 750,
       resizable: true,
       classes: ["zephyr-calculator"]
     };
@@ -148,10 +160,6 @@ class TravelCalculatorUI {
     this.dialog = null;
   }
 
-  // adjustDialogHeight() — удалено: с flex-схемой height:100% Foundry
-  // сам корректно управляет высотой при ресайзе.
-  adjustDialogHeight() {}
-
   getAvailableBonusSails(shipId) {
     return this.calculator.getAvailableBonusSails(shipId);
   }
@@ -164,93 +172,121 @@ class TravelCalculatorUI {
     return this.calculator.getShipDescription(shipId, cargoTons, crewCount);
   }
 
-  // ── Строит SVG компас для выбора курса к ветру ──────────────────────
-  _buildCompassSVG(courses, selectedCourse) {
-    // Курсы расположены от носа (0°) до кормы (180°) — верхняя полуокружность
-    // Мы рисуем 6 секторов в полукруге (180°), снизу вверх
-    const cx = 110, cy = 110, r = 98, innerR = 22;
+  // ==== ЛОГИКА КОМПАСА И УГЛОВ ====
 
-    // Определяем угловые диапазоны для каждого курса (в градусах от 0 = вверх)
-    // Компас смотрит: ветер дует снизу, нос корабля вверху
-    // 0° = прямо против ветра (мёртвая зона), 180° = фордевинд
-    const courseAngles = {
-      "45-close":   { start: 215, end: 245, label: "45°",  sub: "Бейд." },
-      "60-close":   { start: 245, end: 270, label: "60°",  sub: "Бейд." },
-      "90-cross":   { start: 270, end: 290, label: "90°",  sub: "Галфв." },
-      "90-cross-sq":{ start: 290, end: 310, label: "90°▪", sub: "Галфв." },
-      "135-broad":  { start: 310, end: 335, label: "135°", sub: "Бакш." },
-      "180-run":    { start: 335, end: 360, label: "180°", sub: "Форд." }
-    };
+  // Расчет курса (windCourse) на основе разницы углов ветра и корабля
+  calculateWindCourse(windDir, shipDir, shipId) {
+    // Находим абсолютную разницу в углах
+    let delta = Math.abs(windDir - shipDir) % 360;
+    if (delta > 180) delta = 360 - delta;
+    // delta теперь от 0 до 180 (угол атаки ветра)
+    // 0 = встречный ветер, 180 = попутный
+
+    const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
+    const availableCourses = ship?.sailing?.availableCourses || Object.keys(ZEPHYR_WIND_COURSES);
+
+    let mappedCourse = "90-cross"; // fallback
+    if (delta <= 22.5) {
+      // 0 - мертвая зона. Если 45 недоступно, берем ближайшее доступное
+      mappedCourse = availableCourses.includes("45-close") ? "45-close" : 
+                     (availableCourses.includes("60-close") ? "60-close" : "90-cross");
+    } else if (delta <= 67.5) {
+      if (delta <= 50) mappedCourse = "45-close";
+      else mappedCourse = "60-close";
+    } else if (delta <= 112.5) {
+      mappedCourse = "90-cross";
+    } else if (delta <= 157.5) {
+      mappedCourse = "135-broad";
+    } else {
+      mappedCourse = "180-run";
+    }
+
+    // Защита от недоступных курсов у корабля
+    if (!availableCourses.includes(mappedCourse) && availableCourses.length > 0) {
+      mappedCourse = availableCourses[0];
+    }
+    return mappedCourse;
+  }
+
+  // Отрисовка двухслойной розы ветров
+  _buildDualCompassSVG(windDir, shipDir) {
+    const cx = 110, cy = 110;
+    const outerR = 100, innerR = 65, centerR = 30;
+
+    const dirs = [
+      { a: 0, label: "N" }, { a: 45, label: "NE" }, { a: 90, label: "E" }, { a: 135, label: "SE" },
+      { a: 180, label: "S" }, { a: 225, label: "SW" }, { a: 270, label: "W" }, { a: 315, label: "NW" }
+    ];
 
     function polarToXY(angleDeg, radius) {
+      // svg 0 = top (N)
       const rad = (angleDeg - 90) * Math.PI / 180;
-      return {
-        x: cx + radius * Math.cos(rad),
-        y: cy + radius * Math.sin(rad)
-      };
+      return { x: cx + radius * Math.cos(rad), y: cy + radius * Math.sin(rad) };
     }
 
-    function sectorPath(startDeg, endDeg, outerR, innerR) {
-      const s1 = polarToXY(startDeg, outerR);
-      const e1 = polarToXY(endDeg, outerR);
-      const s2 = polarToXY(endDeg, innerR);
-      const e2 = polarToXY(startDeg, innerR);
-      const large = (endDeg - startDeg) > 180 ? 1 : 0;
-      return `M ${s1.x} ${s1.y} A ${outerR} ${outerR} 0 ${large} 1 ${e1.x} ${e1.y} L ${s2.x} ${s2.y} A ${innerR} ${innerR} 0 ${large} 0 ${e2.x} ${e2.y} Z`;
+    function drawRing(dirs, curAngle, type, rOut, rIn, fillBase, fillActive) {
+      let html = "";
+      dirs.forEach(d => {
+        const start = d.a - 22.5;
+        const end = d.a + 22.5;
+        const isActive = (d.a === curAngle);
+        
+        const p1 = polarToXY(start, rOut);
+        const p2 = polarToXY(end, rOut);
+        const p3 = polarToXY(end, rIn);
+        const p4 = polarToXY(start, rIn);
+
+        // SVG Path for an arc slice
+        const path = `M ${p1.x} ${p1.y} A ${rOut} ${rOut} 0 0 1 ${p2.x} ${p2.y} L ${p3.x} ${p3.y} A ${rIn} ${rIn} 0 0 0 ${p4.x} ${p4.y} Z`;
+        
+        // Label position
+        const mid = polarToXY(d.a, (rOut + rIn) / 2);
+        
+        html += `<g class="compass-sector ${isActive ? 'active' : ''}" data-type="${type}" data-angle="${d.a}">
+          <path d="${path}" fill="${isActive ? fillActive : fillBase}" stroke="#b8905c" stroke-width="1"/>
+          <text x="${mid.x}" y="${mid.y + 4}" text-anchor="middle" font-size="10" fill="${isActive ? '#fff' : '#e8d5b5'}" font-weight="bold">${d.label}</text>
+        </g>`;
+      });
+      return html;
     }
 
-    let sectorsHTML = "";
-    for (const courseKey of courses) {
-      const angle = courseAngles[courseKey];
-      if (!angle) continue;
-      const midAngle = (angle.start + angle.end) / 2;
-      const midR = (r + innerR) / 2;
-      const mid = polarToXY(midAngle, midR);
-      const isActive = courseKey === selectedCourse;
+    const outerRing = drawRing(dirs, windDir, "wind", outerR, innerR, "rgba(20, 15, 10, 0.7)", "rgba(100, 160, 200, 0.6)");
+    const innerRing = drawRing(dirs, shipDir, "ship", innerR, centerR, "rgba(40, 30, 20, 0.8)", "rgba(200, 100, 50, 0.6)");
 
-      sectorsHTML += `<g class="compass-sector${isActive ? " active" : ""}" data-course="${courseKey}">
-        <path d="${sectorPath(angle.start, angle.end, r, innerR)}"/>
-        <text x="${mid.x}" y="${mid.y - 5}">${angle.label}</text>
-        <text x="${mid.x}" y="${mid.y + 8}" style="font-size:8px">${angle.sub}</text>
-      </g>`;
-    }
+    // Рисуем стрелку ветра (откуда дует)
+    // Ветер N (0) дует С СЕВЕРА НА ЮГ. Угол стрелки = windDir + 180
+    const wArrowAngle = (windDir + 180) % 360;
+    const wArrowTail = polarToXY(windDir, outerR - 5);
+    const wArrowHead = polarToXY(windDir, centerR + 5);
 
-    // Стрелка ветра (всегда снизу)
-    const windArrow = `
-      <line x1="${cx}" y1="${cy + innerR + 2}" x2="${cx}" y2="${cy + r - 2}"
-            stroke="rgba(79,195,247,0.5)" stroke-width="2" stroke-dasharray="3,3"/>
-      <text x="${cx}" y="${cy + r + 14}" text-anchor="middle" font-size="9"
-            fill="rgba(126,207,238,0.7)" font-family="Cinzel,serif">↑ ВЕТЕР</text>
-    `;
-
-    // Зона мёртвого угла (нет ветра)
-    const deadZone = `
-      <path d="${sectorPath(180, 215, r, innerR)}"
-            fill="rgba(80,20,20,0.4)" stroke="rgba(180,60,60,0.3)" stroke-width="1"/>
-      <text x="${polarToXY(197, (r+innerR)/2).x}" y="${polarToXY(197, (r+innerR)/2).y}"
-            text-anchor="middle" dominant-baseline="middle"
-            font-size="8" fill="rgba(200,80,80,0.8)" font-family="Cinzel,serif">✗</text>
-    `;
+    // Рисуем стрелку корабля (куда плывет)
+    const sArrowHead = polarToXY(shipDir, innerR - 5);
+    const sArrowTail = polarToXY((shipDir + 180) % 360, centerR + 5);
 
     return `
-      <div class="wind-compass">
-        <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(5,20,50,0.4)"
-                  stroke="rgba(79,195,247,0.2)" stroke-width="1"/>
-          ${deadZone}
-          ${sectorsHTML}
-          ${windArrow}
+      <div class="compass-wrapper">
+        <svg class="compass-svg" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="rgba(10,5,0,0.5)" stroke="#dcb881" stroke-width="2"/>
+          ${outerRing}
+          ${innerRing}
+          <circle cx="${cx}" cy="${cy}" r="${centerR}" fill="#2a1c14" stroke="#dcb881" stroke-width="1"/>
+          
+          <!-- Ship Arrow -->
+          <line x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#dcb881" stroke-width="3" stroke-linecap="round"/>
+          <circle cx="${sArrowHead.x}" cy="${sArrowHead.y}" r="3" fill="#ff9900"/>
+
+          <!-- Wind Arrow -->
+          <line x1="${wArrowTail.x}" y1="${wArrowTail.y}" x2="${wArrowHead.x}" y2="${wArrowHead.y}" stroke="#7fe6ff" stroke-width="2" stroke-dasharray="4,2"/>
+          
+          <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="12" fill="#dcb881">🧭</text>
         </svg>
-        <div class="compass-center">🧭</div>
       </div>`;
   }
 
-  createDialogContent() {
-    const data = this.calculator.normalizeInput(this.calculator.lastData || {});
+  createDialogContent(data) {
     const ship = ZEPHYR_SHIPS_LIBRARY[data.ship];
 
     if (!ship) {
-      console.error(`Ship not found: ${data.ship}`);
       return `<div class="zephyr-bg"></div><div class="zephyr-calc-wrap"><div class="zephyr-scroll">
         <div class="zephyr-section"><p style="color:#ff6b6b;">Ошибка: корабль не найден</p></div>
       </div></div>`;
@@ -258,37 +294,13 @@ class TravelCalculatorUI {
 
     const availableSails = this.getAvailableBonusSails(data.ship);
     const maxCargo = this.getShipMaxCargo(data.ship);
-    const shipCourses = ship.sailing?.availableCourses || Object.keys(ZEPHYR_WIND_COURSES);
 
-    // ── Компас ──────────────────────────────────────────────────────────
-    const compassSVG = this._buildCompassSVG(shipCourses, data.windCourse);
-
-    // ── Кнопки ветра ────────────────────────────────────────────────────
-    const windIcons = { calm: "🪶", weak: "🍃", normal: "💨", strong: "🌬️", storm: "⛈️" };
-    const windShort = { calm: "Штиль", weak: "Бриз", normal: "Свежий", strong: "Крепкий", storm: "Шторм" };
-    const windBtns = Object.entries(ZEPHYR_WIND_FORCES).map(([k]) =>
-      `<div class="wind-btn${data.windForce === k ? " active" : ""}" data-wind="${k}">
-         <span class="wbtn-icon">${windIcons[k]}</span>
-         <span class="wbtn-label">${windShort[k]}</span>
-       </div>`
-    ).join("");
-
-    // ── Кнопки волнения ──────────────────────────────────────────────────
-    const waveIcons = { calm: "〰️", ripple: "🌊", wave: "🌊🌊", stwave: "🌊🌊🌊", storm: "🌀" };
-    const waveShort = { calm: "Рябь", ripple: "Барашки", wave: "Волнение", stwave: "Шторм", storm: "Ураган" };
-    const waveBtns = Object.entries(ZEPHYR_WAVES).map(([k]) =>
-      `<div class="wave-btn${data.waves === k ? " active" : ""}" data-wave="${k}">
-         <span class="wbtn-icon">${waveIcons[k]}</span>
-         <span class="wbtn-label">${waveShort[k]}</span>
-       </div>`
-    ).join("");
-
-    // ── Дополнительные паруса ─────────────────────────────────────────
+    // Доп. паруса
     const sailsOptions = Object.entries(availableSails).map(([k, s]) =>
       `<option value="${k}" ${data.bonusSails === k ? "selected" : ""}>${s.label}</option>`
     ).join("");
 
-    // ── Паруса + корабль ──────────────────────────────────────────────
+    // Корабли
     const shipsOptions = Object.values(ZEPHYR_SHIPS_LIBRARY).map(s =>
       `<option value="${s.id}" ${data.ship === s.id ? "selected" : ""}>${s.name}</option>`
     ).join("");
@@ -300,143 +312,171 @@ class TravelCalculatorUI {
     const oarsRow = ship.sailing?.oars?.available ? `
       <div class="calc-row oars-row">
         <div class="calc-label">Весла:</div>
-        <div class="calc-control calc-inline-control">
+        <div class="calc-control">
           <input type="checkbox" id="useOars" ${data.useOars ? "checked" : ""}/>
-
-          <span class="calc-inline-note">${ship.sailing.oars.maxSpeed} уз. в штиль (≥${ship.sailing.oars.crewRequired} чел)</span>
+          <span>${ship.sailing.oars.maxSpeed} уз. штиль (≥${ship.sailing.oars.crewRequired}ч)</span>
         </div>
       </div>` : "";
+
+    // ── Кнопки ветра (5 шт) ────────────────────────────────────────────────────
+    const windData = [
+      { id: "calm", icon: "🪶", label: "Штиль", sub: "0-1 уз." },
+      { id: "weak", icon: "🍃", label: "Бриз", sub: "2-10 уз." },
+      { id: "normal", icon: "💨", label: "Свежий", sub: "11-21 уз." },
+      { id: "strong", icon: "🌬️", label: "Крепкий", sub: "22-33 уз." },
+      { id: "storm", icon: "⛈️", label: "Шторм", sub: "34+ уз." }
+    ];
+    const windBtns = windData.map(w =>
+      `<div class="wbtn ${data.windForce === w.id ? "active" : ""}" data-target="windForce" data-val="${w.id}">
+         <div class="wbtn-icon">${w.icon}</div>
+         <div class="wbtn-label">${w.label}</div>
+         <div class="wbtn-sub">${w.sub}</div>
+       </div>`
+    ).join("");
+
+    // ── Кнопки волнения (5 шт) ──────────────────────────────────────────────────
+    const waveData = [
+      { id: "calm", icon: "〰️", label: "Штиль", sub: "Гладкое" },
+      { id: "ripple", icon: "🌊", label: "Рябь", sub: "Барашки" },
+      { id: "wave", icon: "🌊🌊", label: "Волнение", sub: "Среднее" },
+      { id: "stwave", icon: "🌊🌊🌊", label: "Шторм", sub: "Сильное" },
+      { id: "storm", icon: "🌀", label: "Ураган", sub: "Опасное" }
+    ];
+    const waveBtns = waveData.map(w =>
+      `<div class="wbtn ${data.waves === w.id ? "active" : ""}" data-target="waves" data-val="${w.id}">
+         <div class="wbtn-icon">${w.icon}</div>
+         <div class="wbtn-label">${w.label}</div>
+         <div class="wbtn-sub">${w.sub}</div>
+       </div>`
+    ).join("");
 
     return `
 <div class="zephyr-bg"></div>
 <div class="zephyr-calc-wrap">
   <div class="zephyr-scroll">
+    <div class="zephyr-layout-cols">
 
-    <!-- ═══ СЕКЦИЯ 1: УСЛОВИЯ ПЛАВАНИЯ ═══ -->
-    <div class="zephyr-section">
-      <div class="zephyr-section__title">⛵ Условия плавания</div>
+      <!-- ═══ ЛЕВАЯ КОЛОНКА: КОРАБЛЬ ═══ -->
+      <div class="zephyr-col-left">
+        <div class="zephyr-section">
+          <div class="zephyr-section__title">⚙️ Параметры корабля</div>
 
-      <!-- Компас курсов к ветру -->
-      <div class="wind-compass-wrap">
-        ${compassSVG}
-        <div class="compass-label" id="courseLabel">${ZEPHYR_WIND_COURSES[data.windCourse]?.label ?? data.windCourse}</div>
-      </div>
-      <input type="hidden" id="windCourse" value="${data.windCourse}"/>
-
-      <!-- Сила ветра -->
-      <div style="margin-top:12px;">
-        <div class="zephyr-section__title" style="font-size:0.7em; margin-bottom:6px; border:none; padding:0;">
-          💨 Сила ветра
-        </div>
-        <div class="wind-btns">${windBtns}</div>
-      </div>
-      <input type="hidden" id="windForce" value="${data.windForce}"/>
-
-      <!-- Волнение -->
-      <div style="margin-top:10px;">
-        <div class="zephyr-section__title" style="font-size:0.7em; margin-bottom:6px; border:none; padding:0;">
-          🌊 Волнение моря
-        </div>
-        <div class="wave-btns">${waveBtns}</div>
-      </div>
-      <input type="hidden" id="waves" value="${data.waves}"/>
-    </div>
-
-    <!-- ═══ СЕКЦИЯ 2: ПАРАМЕТРЫ КОРАБЛЯ ═══ -->
-    <div class="zephyr-section">
-      <div class="zephyr-section__title">⚙️ Параметры корабля</div>
-
-      <div class="calc-row">
-        <div class="calc-label">Корабль:</div>
-        <div class="calc-control">
-          <select id="shipSelect">${shipsOptions}</select>
-        </div>
-      </div>
-
-      <div id="shipInfo" class="ship-info">${this.getShipDescription(data.ship, data.cargo, data.crewCount || 0)}</div>
-
-      <div class="calc-row">
-        <div class="calc-label">Тип экипажа:</div>
-        <div class="calc-control">
-          <select id="crewType">${crewOptions}</select>
-        </div>
-      </div>
-
-      <div class="calc-row">
-        <div class="calc-label">Кол-во экипажа:</div>
-        <div class="calc-control">
-          <input type="number" id="crewCount" value="${data.crewCount || 8}" min="0" step="1" style="width:100px;"/>
-        </div>
-      </div>
-
-      <div class="calc-row">
-        <div class="calc-label">Доп. паруса:</div>
-        <div class="calc-control">
-          <select id="bonusSails">${sailsOptions}</select>
-        </div>
-      </div>
-
-      <div class="calc-row">
-        <div class="calc-label">Загрузка (т):</div>
-        <div class="calc-control">
-          <div class="cargo-slider">
-            <input type="range" id="cargo" min="0" max="${maxCargo}" step="0.1" value="${data.cargo}">
-            <div id="cargoValue" class="cargo-value">${data.cargo} т</div>
+          <div class="calc-row">
+            <div class="calc-label">Корабль:</div>
+            <div class="calc-control">
+              <select id="shipSelect" style="width:100%">${shipsOptions}</select>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div class="calc-row">
-        <div class="calc-label">Штурвал ветра:</div>
-        <div class="calc-control calc-inline-control">
-          <input type="checkbox" id="helm" ${data.helm ? "checked" : ""}/>
-          <span class="calc-inline-note">+5 узлов в любых условиях</span>
-        </div>
-      </div>
+          <div id="shipInfo" class="ship-info">${this.getShipDescription(data.ship, data.cargo, data.crewCount || 0)}</div>
 
-      ${oarsRow}
-    </div>
-
-    <!-- ═══ СЕКЦИЯ 3: МАРШРУТ ═══ -->
-    <div class="zephyr-section">
-      <div class="zephyr-section__title">📏 Маршрут</div>
-
-      <div class="calc-row">
-        <div class="calc-label">Режим:</div>
-        <div class="calc-control">
-          <select id="mode">
-            <option value="distance" ${data.mode === "distance" ? "selected" : ""}>По дистанции</option>
-            <option value="time" ${data.mode === "time" ? "selected" : ""}>По времени</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="mode-distance" style="display:${data.mode === "distance" ? "block" : "none"}">
-        <div class="calc-row">
-          <div class="calc-label">Дистанция:</div>
-          <div class="calc-control calc-inline-control">
-            <input type="number" id="distance" value="${data.distance}" min="0" step="1" style="width:100px;"/>
-            <select id="unit" style="width:130px;">
-              <option value="km" ${data.unit === "km" ? "selected" : ""}>Километры</option>
-              <option value="mi" ${data.unit === "mi" ? "selected" : ""}>Морские мили</option>
-            </select>
+          <div class="calc-row">
+            <div class="calc-label">Тип экипажа:</div>
+            <div class="calc-control">
+              <select id="crewType" style="width:100%">${crewOptions}</select>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div class="mode-time" style="display:${data.mode === "time" ? "block" : "none"}">
-        <div class="calc-row">
-          <div class="calc-label">Время (ч):</div>
-          <div class="calc-control">
-            <input type="number" id="time" value="${data.time}" min="0" step="0.5" style="width:100px;"/>
+          <div class="calc-row">
+            <div class="calc-label">Экипаж (чел):</div>
+            <div class="calc-control">
+              <input type="number" id="crewCount" value="${data.crewCount || 8}" min="0" step="1" style="width:80px;"/>
+            </div>
           </div>
+
+          <div class="calc-row">
+            <div class="calc-label">Доп. паруса:</div>
+            <div class="calc-control">
+              <select id="bonusSails" style="width:100%">${sailsOptions}</select>
+            </div>
+          </div>
+
+          <div class="calc-row">
+            <div class="calc-label">Груз:</div>
+            <div class="calc-control">
+              <div class="cargo-slider">
+                <input type="range" id="cargo" min="0" max="${maxCargo}" step="0.1" value="${data.cargo}">
+                <div id="cargoValue" class="cargo-value">${data.cargo} т</div>
+              </div>
+            </div>
+          </div>
+
+          ${oarsRow}
         </div>
       </div>
-    </div>
 
-    <!-- ═══ РЕЗУЛЬТАТЫ ═══ -->
-    <div class="zephyr-section">
-      <div class="zephyr-section__title">📊 Результаты</div>
+      <!-- ═══ ПРАВАЯ КОЛОНКА: НАВИГАЦИЯ ═══ -->
+      <div class="zephyr-col-right">
+        <div class="zephyr-section">
+          <div class="zephyr-section__title">🧭 Навигация и Погода</div>
+
+          <div class="calc-row">
+            <div class="calc-label">Режим расчёта:</div>
+            <div class="calc-control">
+              <select id="mode" style="width:100%">
+                <option value="distance" ${data.mode === "distance" ? "selected" : ""}>По расстоянию</option>
+                <option value="time" ${data.mode === "time" ? "selected" : ""}>По времени</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="mode-distance" style="display:${data.mode === "distance" ? "block" : "none"}; margin-bottom: 8px;">
+            <div class="calc-row">
+              <div class="calc-label">Дистанция:</div>
+              <div class="calc-control">
+                <input type="number" id="distance" value="${data.distance}" min="0" step="1" style="width:80px;"/>
+                <select id="unit" style="width:90px;">
+                  <option value="km" ${data.unit === "km" ? "selected" : ""}>км</option>
+                  <option value="mi" ${data.unit === "mi" ? "selected" : ""}>миль</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="mode-time" style="display:${data.mode === "time" ? "block" : "none"}; margin-bottom: 8px;">
+            <div class="calc-row">
+              <div class="calc-label">Время (часов):</div>
+              <div class="calc-control">
+                <input type="number" id="time" value="${data.time}" min="0" step="0.5" style="width:80px;"/>
+              </div>
+            </div>
+          </div>
+
+          <div class="compass-container">
+            <div style="font-size:0.85em; color:#a89475; margin-bottom:4px; text-align:center;">Внешний круг: Ветер. Внутренний: Движение.</div>
+            <div id="compassRenderArea">
+              ${this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir)}
+            </div>
+            <!-- Скрытые технические данные -->
+            <div style="font-size:0.9em; margin-top:6px; color:#dcb881; font-weight:bold;">
+              Курс к ветру: <span id="derivedCourseLabel">${ZEPHYR_WIND_COURSES[data.windCourse]?.label ?? data.windCourse}</span>
+            </div>
+            <input type="hidden" id="windCourse" value="${data.windCourse}"/>
+          </div>
+
+          <div class="calc-row" style="justify-content:center; margin: 12px 0;">
+            <div class="calc-control" style="flex:0; background:rgba(20,15,10,0.8); padding:6px 14px; border-radius:6px; border:1px solid rgba(184,144,92,0.3);">
+              <input type="checkbox" id="helm" ${data.helm ? "checked" : ""}/>
+              <label for="helm" style="cursor:pointer; color:#dcb881; font-weight:bold;">Корабельный штурвал (+5 узлов)</label>
+            </div>
+          </div>
+
+          <div style="font-size:0.9em; font-weight:bold; color:#dcb881; margin:8px 0 4px 0;">Сила ветра</div>
+          <div class="wbtn-group">${windBtns}</div>
+          <input type="hidden" id="windForce" value="${data.windForce}"/>
+
+          <div style="font-size:0.9em; font-weight:bold; color:#dcb881; margin:8px 0 4px 0;">Волнение моря</div>
+          <div class="wbtn-group">${waveBtns}</div>
+          <input type="hidden" id="waves" value="${data.waves}"/>
+
+        </div>
+      </div>
+
+    </div> <!-- End Columns Layout -->
+
+    <!-- ═══ СЕКЦИЯ РЕЗУЛЬТАТОВ (На всю ширину внизу) ═══ -->
+    <div class="zephyr-results zephyr-section">
+      <div class="zephyr-section__title">📊 Итоги расчёта</div>
       <div id="calcResult" class="result-panel">
         <div class="result-card">
           <div class="label">Скорость</div>
@@ -444,7 +484,7 @@ class TravelCalculatorUI {
           <div class="sub" id="res-ft">—</div>
         </div>
         <div class="result-card">
-          <div class="label">Дистанция / Время</div>
+          <div class="label">Пройдено / Затрачено</div>
           <div class="value" id="res-dist">—</div>
           <div class="sub" id="res-extra">—</div>
         </div>
@@ -461,8 +501,8 @@ class TravelCalculatorUI {
       </div>
     </div>
 
-  </div><!-- end .zephyr-scroll -->
-</div><!-- end .zephyr-calc-wrap -->`;
+  </div> <!-- end scroll -->
+</div> <!-- end wrapper -->`;
   }
 
   initializeEventHandlers(html) {
@@ -471,43 +511,54 @@ class TravelCalculatorUI {
       this.scheduleSave(html);
     };
 
-    // ── Компас: клик по сектору ──────────────────────────────────────
+    // ── Компас (Клик по внешнему/внутреннему кругу) ────────────────
     html.on("click", ".compass-sector", (e) => {
-      const course = $(e.currentTarget).data("course");
-      if (!course) return;
-      html.find("#windCourse").val(course);
-      html.find(".compass-sector").removeClass("active");
-      $(e.currentTarget).addClass("active");
-      html.find("#courseLabel").text(ZEPHYR_WIND_COURSES[course]?.label ?? course);
+      const el = $(e.currentTarget);
+      const angle = parseInt(el.data("angle"), 10);
+      const type = el.data("type"); // 'wind' или 'ship'
+
+      if (type === "wind") this.uiState.windDir = angle;
+      if (type === "ship") this.uiState.shipDir = angle;
+
+      // Вычисляем новый windCourse
+      const shipId = html.find("#shipSelect").val();
+      const newCourse = this.calculateWindCourse(this.uiState.windDir, this.uiState.shipDir, shipId);
+      
+      html.find("#windCourse").val(newCourse);
+      html.find("#derivedCourseLabel").text(ZEPHYR_WIND_COURSES[newCourse]?.label ?? newCourse);
+
+      // Перерисовываем компас (используя HTML замену внутри контейнера)
+      const compassArea = html.find("#compassRenderArea");
+      compassArea.html(this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir));
+      
       recalcAndQueueSave();
     });
 
-    // ── Кнопки ветра ─────────────────────────────────────────────────
-    html.on("click", ".wind-btn", (e) => {
-      const wind = $(e.currentTarget).data("wind");
-      if (!wind) return;
-      html.find("#windForce").val(wind);
-      html.find(".wind-btn").removeClass("active");
-      $(e.currentTarget).addClass("active");
+    // ── Кнопки ветра/волн (универсальный делегат) ──────────────────
+    html.on("click", ".wbtn", (e) => {
+      const btn = $(e.currentTarget);
+      const targetId = btn.data("target");
+      const val = btn.data("val");
+      if (!targetId || !val) return;
 
-      // Автосинхронизация волнения
-      const autoWave = { calm: "calm", weak: "ripple", normal: "wave", strong: "stwave", storm: "storm" };
-      const newWave = autoWave[wind];
-      if (newWave) {
-        html.find("#waves").val(newWave);
-        html.find(".wave-btn").removeClass("active");
-        html.find(`.wave-btn[data-wave="${newWave}"]`).addClass("active");
+      // Обновляем скрытый инпут
+      html.find(`#${targetId}`).val(val);
+      
+      // Визуально переключаем класс
+      btn.siblings().removeClass("active");
+      btn.addClass("active");
+
+      // Если изменили ветер — автоприменяем волны (если не шторм вручную)
+      if (targetId === "windForce") {
+        const autoWave = { calm: "calm", weak: "ripple", normal: "wave", strong: "stwave", storm: "storm" };
+        const newWave = autoWave[val];
+        if (newWave) {
+          html.find("#waves").val(newWave);
+          const waveBtns = html.find(`.wbtn[data-target="waves"]`);
+          waveBtns.removeClass("active");
+          waveBtns.filter(`[data-val="${newWave}"]`).addClass("active");
+        }
       }
-      recalcAndQueueSave();
-    });
-
-    // ── Кнопки волнения ───────────────────────────────────────────────
-    html.on("click", ".wave-btn", (e) => {
-      const wave = $(e.currentTarget).data("wave");
-      if (!wave) return;
-      html.find("#waves").val(wave);
-      html.find(".wave-btn").removeClass("active");
-      $(e.currentTarget).addClass("active");
       recalcAndQueueSave();
     });
 
@@ -556,17 +607,13 @@ class TravelCalculatorUI {
     const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
     if (!ship) return;
 
-    const currentCourse = html.find("#windCourse").val();
+    // Сброс и проверка доступности курсов при смене судна
+    const newCourse = this.calculateWindCourse(this.uiState.windDir, this.uiState.shipDir, shipId);
+    html.find("#windCourse").val(newCourse);
+    html.find("#derivedCourseLabel").text(ZEPHYR_WIND_COURSES[newCourse]?.label ?? newCourse);
+
     const currentBonusSails = html.find("#bonusSails").val();
     const currentUseOars = html.find("#useOars").is(":checked");
-    const shipCourses = ship.sailing?.availableCourses || Object.keys(ZEPHYR_WIND_COURSES);
-
-    // Перестраиваем компас под новый корабль
-    const selectedCourse = shipCourses.includes(currentCourse) ? currentCourse : shipCourses[0];
-    const compassWrap = html.find(".wind-compass-wrap");
-    const compassSVG = this._buildCompassSVG(shipCourses, selectedCourse);
-    compassWrap.html(`${compassSVG}<div class="compass-label" id="courseLabel">${ZEPHYR_WIND_COURSES[selectedCourse]?.label ?? selectedCourse}</div>`);
-    html.find("#windCourse").val(selectedCourse);
 
     // Доп. паруса
     const availableSails = this.getAvailableBonusSails(shipId);
@@ -592,18 +639,19 @@ class TravelCalculatorUI {
     const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
     const hasOars = ship?.sailing?.oars?.available;
     const existingOarsRow = html.find(".oars-row");
+    const hasExisting = existingOarsRow.length > 0;
 
-    if (hasOars && existingOarsRow.length === 0) {
+    if (hasOars && !hasExisting) {
       const oarsHTML = `
       <div class="calc-row oars-row">
         <div class="calc-label">Весла:</div>
-        <div class="calc-control calc-inline-control">
+        <div class="calc-control">
           <input type="checkbox" id="useOars"/>
-          <span class="calc-inline-note">${ship.sailing.oars.maxSpeed} уз. в штиль (≥${ship.sailing.oars.crewRequired} чел)</span>
+          <span>${ship.sailing.oars.maxSpeed} уз. штиль (≥${ship.sailing.oars.crewRequired}ч)</span>
         </div>
       </div>`;
-      html.find("#helm").closest(".calc-row").after(oarsHTML);
-    } else if (!hasOars && existingOarsRow.length > 0) {
+      html.find("#cargo").closest(".calc-row").after(oarsHTML);
+    } else if (!hasOars && hasExisting) {
       existingOarsRow.remove();
     }
   }
@@ -660,7 +708,9 @@ class TravelCalculatorUI {
       crewCount: parseInt(html.find("#crewCount").val() || 0, 10),
       helm: !!html.find("#helm")[0]?.checked,
       cargo: parseFloat(html.find("#cargo").val()) || 0,
-      useOars: hasOars ? !!html.find("#useOars")[0]?.checked : false
+      useOars: hasOars ? !!html.find("#useOars")[0]?.checked : false,
+      windDir: this.uiState.windDir,
+      shipDir: this.uiState.shipDir
     };
   }
 
@@ -670,7 +720,7 @@ class TravelCalculatorUI {
       const result = this.calculator.calculateTravelFromData(data);
       this.displayResultCompact(html, result, result.input);
     } catch (e) {
-      html.find("#calcResult").html(`<div style="color:#ff6b6b;">Ошибка: ${e.message}</div>`);
+      html.find("#calcResult").html(`<div style="color:#ff6b6b; padding:10px;">Ошибка: ${e.message}</div>`);
     }
   }
 
@@ -682,8 +732,8 @@ class TravelCalculatorUI {
       html.find("#res-dist").text(`${data.distance} ${data.unit === "km" ? "км" : "миль"}`);
       html.find("#res-extra").text(`${result.time.days}д ${result.time.hours}ч ${result.time.minutes}м`);
     } else {
-      html.find("#res-dist").text(`${result.distanceKm.toFixed(1)} км`);
-      html.find("#res-extra").text(`${result.distanceMi.toFixed(1)} миль`);
+      html.find("#res-dist").text(`${result.timeHours} ч.`);
+      html.find("#res-extra").text(`${result.distanceKm.toFixed(1)} км / ${result.distanceMi.toFixed(1)} миль`);
     }
 
     html.find("#res-mano").text(`${(result.shipState.maneuverability * 100).toFixed(0)}%`);
