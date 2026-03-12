@@ -3,9 +3,7 @@
   display: flex;
   flex-direction: column;
   width: max-content; /* автоширина по контенту */
-  height: auto; /* высота под контент */
   max-width: 90vw;
-  max-height: 90vh;
 }
 
 .zephyr-calculator .content {
@@ -53,14 +51,18 @@
 
 /* Dialog specific styles */
 .zephyr-calculator .window-content {
-  background: 
-	linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
-	url('../assets/sea-map.jpg') no-repeat center center;
+  background:
+    linear-gradient(rgba(0,0,0,0.4), rgba(0,0,0,0.4)),
+    url('modules/zephyrs-sea-travel-calculator/assets/sea-map.jpg') no-repeat center center;
   background-size: cover;
   backdrop-filter: blur(3px);
   color: #f0e6d2 !important;
   padding: 0 !important;
-  overflow: visible; /* чтобы контент мог расти */
+  /* height: 100% — позволяет Foundry корректно ресайзить окно по вертикали */
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
   font-family: 'Cinzel', serif;
 }
 
@@ -71,13 +73,18 @@
   padding: 14px;
   display: flex;
   flex-direction: column;
-  min-height: auto;
+  /* flex: 1 — растягивается на всю доступную высоту window-content */
+  flex: 1 1 auto;
+  min-height: 0;
   color: #f0e6d2;
+  overflow: hidden;
 }
 
 .zephyr-calculator .calc-content {
+  /* flex: 1 — занимает всё пространство контейнера, прокрутка внутри */
+  flex: 1 1 auto;
   overflow-y: auto;
-  max-height: 80vh; /* скролл только если контент больше окна */
+  min-height: 0;
   margin-bottom: 10px; /* отступ до кнопок */
 }
 
@@ -104,10 +111,10 @@
   border-radius: 6px;
   box-sizing: border-box;
   -webkit-appearance: none;
+  appearance: none;
   height: 36px;
   line-height: 20px;
   display: block;
-  vertical-align: middle;
   font-family: 'Cinzel', serif;
 }
 
@@ -178,6 +185,7 @@
 
 .zephyr-calculator input[type="range"] {
   -webkit-appearance: none;
+  appearance: none;
   width: 100%;
   height: 8px;
   background: rgba(255,255,255,0.06);

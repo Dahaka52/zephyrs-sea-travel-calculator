@@ -163,20 +163,9 @@ class TravelCalculatorUI {
     this.dialog = null;
   }
 
-  adjustDialogHeight() {
-    if (!this.dialog) return;
-    const dialogElement = this.getDialogElement();
-    if (!dialogElement) return;
-    const contentEl = dialogElement.querySelector(".calc-container");
-    if (!contentEl) return;
-
-    const desired = Math.min(window.innerHeight * 0.9, contentEl.scrollHeight + 120);
-    try {
-      this.dialog.setPosition({ height: Math.round(desired) });
-    } catch (e) {
-      console.warn("Zephyr: Could not adjust dialog height", e);
-    }
-  }
+  // adjustDialogHeight() — удалено: с flex-схемой height:100% Foundry
+  // сам корректно управляет высотой при ресайзе.
+  adjustDialogHeight() {}
 
   getAvailableBonusSails(shipId) {
     return this.calculator.getAvailableBonusSails(shipId);
@@ -381,7 +370,6 @@ class TravelCalculatorUI {
     html.find("#mode").on("change", () => {
       this.updateMode(html);
       recalcAndQueueSave();
-      this.adjustDialogHeight();
     });
 
     html.find("#windForce").on("change", () => {
@@ -403,7 +391,6 @@ class TravelCalculatorUI {
     html.find("#shipSelect").on("change", () => {
       this.updateShip(html);
       recalcAndQueueSave();
-      this.adjustDialogHeight();
     });
 
     html.find("#cargo").on("input change", () => {
@@ -411,14 +398,12 @@ class TravelCalculatorUI {
       html.find("#cargoValue").text(`${cargoValue.toFixed(1)} т`);
       this.updateShipInfo(html);
       recalcAndQueueSave();
-      this.adjustDialogHeight();
     });
 
     html.find("#crewCount").on("input change", () => {
       this.updateCargoLimits(html);
       this.updateShipInfo(html);
       recalcAndQueueSave();
-      this.adjustDialogHeight();
     });
 
     html.find("#windCourse, #waves, #crewType, #bonusSails, #helm, #distance, #time, #unit")
@@ -429,7 +414,6 @@ class TravelCalculatorUI {
     this.updateMode(html);
     this.updateCargoLimits(html);
     this.calculate(html);
-    this.adjustDialogHeight();
   }
 
   updateMode(html) {
@@ -578,8 +562,6 @@ class TravelCalculatorUI {
     html.find("#res-radius").text(`≈ ${Math.round(result.shipState.turnRadiusFt)} фт`);
     html.find("#res-cargo").text(`${result.shipState.effectiveCargo.toFixed(2)} т / ${this.getShipMaxCargo(data.ship)} т`);
     html.find("#res-crew").text(`${data.crewCount} чел (≈ ${result.shipState.crewWeightTons.toFixed(2)} т)`);
-
-    this.adjustDialogHeight();
   }
 
   calculateAndSend(html) {

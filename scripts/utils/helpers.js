@@ -34,7 +34,7 @@ async function createTravelMacro() {
  */
 async function createWeatherMacro() {
   try {
-    const MACRO_NAME = "🌊 Генератор морской погоды";
+    const MACRO_NAME = "Генератор морской погоды";
     if (game.macros?.find(m => m.name === MACRO_NAME)) return;
     if (!game.user?.isGM) return;
     if (typeof ZEPHYR_WEATHER_MACRO_COMMAND === "undefined") {
