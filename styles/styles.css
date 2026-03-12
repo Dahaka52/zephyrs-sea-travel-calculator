@@ -10,6 +10,13 @@
   overflow: hidden; /* Let our custom wrapper scroll */
   display: flex;
   flex-direction: column;
+  position: relative;
+}
+
+.zephyr-calculator .window-resizable-handle {
+  z-index: 5;
+  width: 16px;
+  height: 16px;
 }
 
 .zephyr-bg {
@@ -20,6 +27,7 @@
     url('modules/zephyrs-sea-travel-calculator/assets/sea-map.jpg') no-repeat center center;
   background-size: cover;
   z-index: 0;
+  pointer-events: none;
 }
 
 .zephyr-calc-wrap {
@@ -150,6 +158,38 @@
   color: #dcb881;
 }
 
+.helm-row {
+  justify-content: center;
+  margin: 12px 0;
+}
+
+.helm-toggle {
+  flex: 1 1 100%;
+  width: 100%;
+  background: rgba(20, 15, 10, 0.8);
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(184, 144, 92, 0.3);
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  column-gap: 10px;
+  row-gap: 4px;
+  align-items: start;
+}
+
+.helm-toggle label {
+  cursor: pointer;
+  color: #dcb881;
+  font-weight: bold;
+  white-space: normal;
+  line-height: 1.2;
+}
+
+.helm-toggle input[type="checkbox"] {
+  align-self: start;
+  margin-top: 2px;
+}
+
 /* Wind / Wave Buttons (5 per row) */
 .wbtn-group {
   display: flex;
@@ -229,6 +269,18 @@
   stroke-width: 2px !important;
 }
 
+.compass-arrow--ship {
+  filter: drop-shadow(0 0 2px rgba(220, 184, 129, 0.7));
+}
+
+.compass-arrow--wind {
+  filter: drop-shadow(0 0 2px rgba(127, 230, 255, 0.8));
+}
+
+.compass-arrow-head--ship {
+  filter: drop-shadow(0 0 2px rgba(255, 178, 74, 0.7));
+}
+
 /* Result Panel (Bottom Full Width) */
 .zephyr-results {
   width: 100%;
@@ -238,7 +290,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
-  margin-top: 8px;
+  margin-top: 0;
 }
 .result-card {
   flex: 1;

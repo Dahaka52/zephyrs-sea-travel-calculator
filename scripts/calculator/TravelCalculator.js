@@ -48,12 +48,14 @@ var SeaTravelCalculator = (() => {
         crewCount: 8,
         helm: false,
         cargo: 0,
-        useOars: false
+        useOars: false,
+        windDir: 0,
+        shipDir: 90
       };
     }
 
     getDefaultWindowSettings() {
-      return { width: 800, height: 600, top: null, left: null };
+      return { width: 980, height: 750, top: null, left: null };
     }
 
     ensureSettingsRegistered() {
@@ -132,6 +134,7 @@ var SeaTravelCalculator = (() => {
       const merged = { ...defaults, ...(rawData || {}) };
       const shipId = ZEPHYR_SHIPS_LIBRARY[merged.ship] ? merged.ship : defaults.ship;
       const ship = ZEPHYR_SHIPS_LIBRARY[shipId];
+      const compassAngles = [0, 45, 90, 135, 180, 225, 270, 315];
 
       const shipCourses = (ship?.sailing?.availableCourses && ship.sailing.availableCourses.length)
         ? ship.sailing.availableCourses
@@ -169,7 +172,9 @@ var SeaTravelCalculator = (() => {
         crewCount: Math.max(0, parseInt(merged.crewCount || 0, 10)),
         helm: !!merged.helm,
         cargo: this.toNonNegativeNumber(merged.cargo, defaults.cargo),
-        useOars: hasOars ? !!merged.useOars : false
+        useOars: hasOars ? !!merged.useOars : false,
+        windDir: compassAngles.includes(Number(merged.windDir)) ? Number(merged.windDir) : defaults.windDir,
+        shipDir: compassAngles.includes(Number(merged.shipDir)) ? Number(merged.shipDir) : defaults.shipDir
       };
     }
 

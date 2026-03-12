@@ -20,8 +20,11 @@ class TravelCalculatorUI {
   }
 
   getDialogElement() {
+    if (!this.dialog) return null;
+    const el = this.dialog.element?.[0] ?? this.dialog.element;
+    if (el instanceof HTMLElement) return el;
     if (!this.dialog?.appId) return null;
-    return document.querySelector(`.app.window-app[data-appid="${this.dialog.appId}"]`);
+    return document.querySelector(`[data-appid="${this.dialog.appId}"]`);
   }
 
   render() {
@@ -37,16 +40,26 @@ class TravelCalculatorUI {
     this.uiState.shipDir = data.shipDir ?? 90;
 
     const content = this.createDialogContent(data);
-    const ws = this.calculator.windowSettings || { width: 850, height: 750, top: null, left: null };
+    const defaults = (typeof this.calculator.getDefaultWindowSettings === "function")
+      ? this.calculator.getDefaultWindowSettings()
+      : { width: 980, height: 750, top: null, left: null };
+    const ws = { ...defaults, ...(this.calculator.windowSettings || {}) };
     const options = {
-      width: ws.width || 850,
-      height: ws.height || 750,
+      width: ws.width || defaults.width,
+      height: ws.height || defaults.height,
       resizable: true,
       classes: ["zephyr-calculator", "flexcol"]
     };
 
     if (Number.isFinite(ws.top)) options.top = ws.top;
     if (Number.isFinite(ws.left)) options.left = ws.left;
+    options.position = {
+      width: options.width,
+      height: options.height,
+      ...(Number.isFinite(ws.top) ? { top: ws.top } : {}),
+      ...(Number.isFinite(ws.left) ? { left: ws.left } : {}),
+      resizable: true
+    };
 
     this.dialog = new Dialog({
       title: "🧭 Калькулятор морского перехода",
@@ -272,11 +285,11 @@ class TravelCalculatorUI {
           <circle cx="${cx}" cy="${cy}" r="${centerR}" fill="#2a1c14" stroke="#dcb881" stroke-width="1"/>
           
           <!-- Ship Arrow -->
-          <line x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#dcb881" stroke-width="3" stroke-linecap="round"/>
-          <circle cx="${sArrowHead.x}" cy="${sArrowHead.y}" r="3" fill="#ff9900"/>
+          <line class="compass-arrow compass-arrow--ship" x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#dcb881" stroke-width="4" stroke-linecap="round"/>
+          <circle class="compass-arrow-head compass-arrow-head--ship" cx="${sArrowHead.x}" cy="${sArrowHead.y}" r="4" fill="#ffb24a"/>
 
           <!-- Wind Arrow -->
-          <line x1="${wArrowTail.x}" y1="${wArrowTail.y}" x2="${wArrowHead.x}" y2="${wArrowHead.y}" stroke="#7fe6ff" stroke-width="2" stroke-dasharray="4,2"/>
+          <line class="compass-arrow compass-arrow--wind" x1="${wArrowTail.x}" y1="${wArrowTail.y}" x2="${wArrowHead.x}" y2="${wArrowHead.y}" stroke="#9ff0ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="5,3"/>
           
           <text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="12" fill="#dcb881">🧭</text>
         </svg>
@@ -443,10 +456,10 @@ class TravelCalculatorUI {
             <input type="hidden" id="windCourse" value="${data.windCourse}"/>
           </div>
 
-          <div class="calc-row" style="justify-content:center; margin: 12px 0;">
-            <div class="calc-control" style="flex:0; background:rgba(20,15,10,0.8); padding:6px 14px; border-radius:6px; border:1px solid rgba(184,144,92,0.3);">
+          <div class="calc-row helm-row">
+            <div class="calc-control helm-toggle">
               <input type="checkbox" id="helm" ${data.helm ? "checked" : ""}/>
-              <label for="helm" style="cursor:pointer; color:#dcb881; font-weight:bold;">Корабельный штурвал (+5 узлов)</label>
+              <label for="helm">Корабельный штурвал (+5 узлов)</label>
             </div>
           </div>
 
@@ -465,7 +478,6 @@ class TravelCalculatorUI {
 
     <!-- ═══ СЕКЦИЯ РЕЗУЛЬТАТОВ (На всю ширину внизу) ═══ -->
     <div class="zephyr-results zephyr-section">
-      <div class="zephyr-section__title">📊 Итоги расчёта</div>
       <div id="calcResult" class="result-panel">
         <div class="result-card">
           <div class="label">Скорость</div>
