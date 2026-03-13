@@ -13,6 +13,10 @@ class TravelCalculatorUI {
     this.pendingWindowSaveTimer = null;
     this.pendingWindowSettings = null;
 
+    this.isDraggingShip = false;
+    this.lastShipDragAngle = null;
+    this.onDocumentMouseUp = null;
+
     this.trackedWindowElement = null;
     this.onWindowMouseUp = null;
 
@@ -202,6 +206,36 @@ class TravelCalculatorUI {
     this.onWindowMouseUp = null;
   }
 
+  setupCompassDragging() {
+    if (this.onDocumentMouseUp) return;
+    this.onDocumentMouseUp = (event) => {
+      if (!this.isDraggingShip) return;
+      let angle = null;
+      const target = event.target;
+      const sector = target?.closest?.(".compass-sector");
+      if (sector && sector.dataset?.type === "ship") {
+        const parsed = parseInt(sector.dataset.angle, 10);
+        if (Number.isFinite(parsed)) angle = parsed;
+      }
+      if (!Number.isFinite(angle)) angle = this.lastShipDragAngle;
+      if (Number.isFinite(angle) && typeof this.applyCompassSelection === "function") {
+        this.applyCompassSelection("ship", angle, true);
+      }
+      this.isDraggingShip = false;
+    };
+    document.addEventListener("mouseup", this.onDocumentMouseUp);
+  }
+
+  teardownCompassDragging() {
+    if (this.onDocumentMouseUp) {
+      document.removeEventListener("mouseup", this.onDocumentMouseUp);
+      this.onDocumentMouseUp = null;
+    }
+    this.isDraggingShip = false;
+    this.lastShipDragAngle = null;
+    this.applyCompassSelection = null;
+  }
+
   saveWindowPosition() {
     const dialogElement = this.getDialogElement();
     if (!dialogElement) return;
@@ -236,6 +270,7 @@ class TravelCalculatorUI {
     this.saveWindowPosition();
     this.flushWindowSave();
     this.teardownWindowTracking();
+    this.teardownCompassDragging();
     this.dialog = null;
   }
 
@@ -322,12 +357,12 @@ class TravelCalculatorUI {
     ];
 
     const shipDirs = [
-      { a: 0, label: "N" }, { a: 15, label: "" }, { a: 30, label: "" }, { a: 45, label: "NE" },
-      { a: 60, label: "" }, { a: 75, label: "" }, { a: 90, label: "E" }, { a: 105, label: "" },
-      { a: 120, label: "" }, { a: 135, label: "SE" }, { a: 150, label: "" }, { a: 165, label: "" },
-      { a: 180, label: "S" }, { a: 195, label: "" }, { a: 210, label: "" }, { a: 225, label: "SW" },
-      { a: 240, label: "" }, { a: 255, label: "" }, { a: 270, label: "W" }, { a: 285, label: "" },
-      { a: 300, label: "" }, { a: 315, label: "NW" }, { a: 330, label: "" }, { a: 345, label: "" }
+      { a: 0, label: "" }, { a: 15, label: "" }, { a: 30, label: "" }, { a: 45, label: "" },
+      { a: 60, label: "" }, { a: 75, label: "" }, { a: 90, label: "" }, { a: 105, label: "" },
+      { a: 120, label: "" }, { a: 135, label: "" }, { a: 150, label: "" }, { a: 165, label: "" },
+      { a: 180, label: "" }, { a: 195, label: "" }, { a: 210, label: "" }, { a: 225, label: "" },
+      { a: 240, label: "" }, { a: 255, label: "" }, { a: 270, label: "" }, { a: 285, label: "" },
+      { a: 300, label: "" }, { a: 315, label: "" }, { a: 330, label: "" }, { a: 345, label: "" }
     ];
 
     function polarToXY(angleDeg, radius) {
@@ -383,7 +418,7 @@ class TravelCalculatorUI {
               <path d="M0,0 L6,3 L0,6 Z" fill="#9ff0ff"/>
             </marker>
             <marker id="zephyr-ship-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto" markerUnits="strokeWidth">
-              <path d="M0,0 L7,3.5 L0,7 Z" fill="#ffb24a"/>
+              <path d="M0,0 L7,3.5 L0,7 Z" fill="#e34a4a"/>
             </marker>
           </defs>
           <circle cx="${cx}" cy="${cy}" r="${outerR}" fill="rgba(10,5,0,0.5)" stroke="#dcb881" stroke-width="2"/>
@@ -392,7 +427,7 @@ class TravelCalculatorUI {
           <circle cx="${cx}" cy="${cy}" r="${centerR}" fill="#2a1c14" stroke="#dcb881" stroke-width="1"/>
           
           <!-- Ship Arrow -->
-          <line class="compass-arrow compass-arrow--ship" x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#dcb881" stroke-width="4" stroke-linecap="round" marker-end="url(#zephyr-ship-arrow)"/>
+          <line class="compass-arrow compass-arrow--ship" x1="${sArrowTail.x}" y1="${sArrowTail.y}" x2="${sArrowHead.x}" y2="${sArrowHead.y}" stroke="#e34a4a" stroke-width="4" stroke-linecap="round" marker-end="url(#zephyr-ship-arrow)"/>
 
           <!-- Wind Arrow -->
           <line class="compass-arrow compass-arrow--wind" x1="${wArrowTail.x}" y1="${wArrowTail.y}" x2="${wArrowHead.x}" y2="${wArrowHead.y}" stroke="#9ff0ff" stroke-width="3" stroke-linecap="round" stroke-dasharray="5,3" marker-end="url(#zephyr-wind-arrow)"/>
@@ -627,26 +662,53 @@ class TravelCalculatorUI {
     };
 
     // ── Компас (Клик по внешнему/внутреннему кругу) ────────────────
-    html.on("click", ".compass-sector", (e) => {
-      const el = $(e.currentTarget);
-      const angle = parseInt(el.data("angle"), 10);
-      const type = el.data("type"); // 'wind' или 'ship'
-
+    const updateCompassSelection = (type, angle, commit = true) => {
+      if (!Number.isFinite(angle)) return;
       if (type === "wind") this.uiState.windDir = angle;
       if (type === "ship") this.uiState.shipDir = angle;
 
-      // Вычисляем новый windCourse
       const shipId = html.find("#shipSelect").val();
       const newCourse = this.calculateWindCourse(this.uiState.windDir, this.uiState.shipDir, shipId);
-      
       html.find("#windCourse").val(newCourse);
       html.find("#derivedCourseLabel").text(this.getWindCourseLabel(newCourse));
 
-      // Перерисовываем компас (используя HTML замену внутри контейнера)
       const compassArea = html.find("#compassRenderArea");
       compassArea.html(this._buildDualCompassSVG(this.uiState.windDir, this.uiState.shipDir));
-      
-      recalcAndQueueSave();
+
+      if (commit) recalcAndQueueSave();
+    };
+
+    this.applyCompassSelection = updateCompassSelection;
+    this.setupCompassDragging();
+
+    html.on("click", ".compass-sector", (e) => {
+      const el = $(e.currentTarget);
+      const type = el.data("type"); // 'wind' или 'ship'
+      if (type !== "wind") return;
+      const angle = parseInt(el.data("angle"), 10);
+      updateCompassSelection("wind", angle, true);
+    });
+
+    html.on("mousedown", ".compass-sector", (e) => {
+      const el = $(e.currentTarget);
+      const type = el.data("type");
+      if (type !== "ship") return;
+      const angle = parseInt(el.data("angle"), 10);
+      this.isDraggingShip = true;
+      this.lastShipDragAngle = angle;
+      updateCompassSelection("ship", angle, false);
+      e.preventDefault();
+    });
+
+    html.on("mouseover", ".compass-sector", (e) => {
+      if (!this.isDraggingShip) return;
+      const el = $(e.currentTarget);
+      const type = el.data("type");
+      if (type !== "ship") return;
+      const angle = parseInt(el.data("angle"), 10);
+      if (!Number.isFinite(angle)) return;
+      this.lastShipDragAngle = angle;
+      updateCompassSelection("ship", angle, false);
     });
 
     html.find("#sendToChat").on("click", () => {

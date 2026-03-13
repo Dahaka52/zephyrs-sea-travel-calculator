@@ -398,7 +398,7 @@
 }
 
 .compass-arrow--ship {
-  filter: drop-shadow(0 0 2px rgba(220, 184, 129, 0.7));
+  filter: drop-shadow(0 0 2px rgba(227, 74, 74, 0.8));
 }
 
 .compass-arrow--wind {
