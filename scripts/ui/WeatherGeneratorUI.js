@@ -112,6 +112,11 @@ class WeatherGeneratorUI {
               `</div>` +
             `</div>` +
           `</form>` +
+          `<div class="calc-actions">` +
+            `<button type="button" class="zephyr-action-btn" id="weatherGenerate">` +
+              `<i class="fas fa-cloud-sun"></i> ${this.t("WEATHER_GENERATE")}` +
+            `</button>` +
+          `</div>` +
         `</div>` +
       `</div>`;
 
@@ -146,23 +151,17 @@ class WeatherGeneratorUI {
           const next = seasons.includes(current) ? current : seasons[0];
           html.find("#season").html(buildSeasonOptions(zone, next));
         });
+        html.find("#weatherGenerate").on("click", () => {
+          this.generateWeather(html, {
+            moduleId: MODULE_ID,
+            flags: { F_HOUR, F_ZONE, F_SEASON },
+            climate: CLIMATE,
+            zoneKeys,
+            lang
+          });
+        });
       },
-      buttons: {
-        ok: {
-          label: this.t("WEATHER_GENERATE"),
-          callback: (html) => {
-            this.generateWeather(html, {
-              moduleId: MODULE_ID,
-              flags: { F_HOUR, F_ZONE, F_SEASON },
-              climate: CLIMATE,
-              zoneKeys,
-              lang
-            });
-            return false;
-          }
-        }
-      },
-      default: "ok",
+      buttons: {},
       close: (html) => this.closeDialog(html)
     }, options);
 
