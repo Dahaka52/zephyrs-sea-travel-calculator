@@ -16,6 +16,8 @@ class TravelCalculatorUI {
     this.isDraggingShip = false;
     this.lastShipDragAngle = null;
     this.onDocumentMouseUp = null;
+    this.onDocumentMouseLeave = null;
+    this.onWindowBlur = null;
 
     this.trackedWindowElement = null;
     this.onWindowMouseUp = null;
@@ -206,6 +208,16 @@ class TravelCalculatorUI {
     this.onWindowMouseUp = null;
   }
 
+  finishShipDrag(angle) {
+    if (!this.isDraggingShip) return;
+    const finalAngle = Number.isFinite(angle) ? angle : this.lastShipDragAngle;
+    if (Number.isFinite(finalAngle) && typeof this.applyCompassSelection === "function") {
+      this.applyCompassSelection("ship", finalAngle, true);
+    }
+    this.isDraggingShip = false;
+    this.lastShipDragAngle = null;
+  }
+
   setupCompassDragging() {
     if (this.onDocumentMouseUp) return;
     this.onDocumentMouseUp = (event) => {
@@ -217,19 +229,27 @@ class TravelCalculatorUI {
         const parsed = parseInt(sector.dataset.angle, 10);
         if (Number.isFinite(parsed)) angle = parsed;
       }
-      if (!Number.isFinite(angle)) angle = this.lastShipDragAngle;
-      if (Number.isFinite(angle) && typeof this.applyCompassSelection === "function") {
-        this.applyCompassSelection("ship", angle, true);
-      }
-      this.isDraggingShip = false;
+      this.finishShipDrag(angle);
     };
+    this.onDocumentMouseLeave = () => this.finishShipDrag();
+    this.onWindowBlur = () => this.finishShipDrag();
     document.addEventListener("mouseup", this.onDocumentMouseUp);
+    document.addEventListener("mouseleave", this.onDocumentMouseLeave);
+    window.addEventListener("blur", this.onWindowBlur);
   }
 
   teardownCompassDragging() {
     if (this.onDocumentMouseUp) {
       document.removeEventListener("mouseup", this.onDocumentMouseUp);
       this.onDocumentMouseUp = null;
+    }
+    if (this.onDocumentMouseLeave) {
+      document.removeEventListener("mouseleave", this.onDocumentMouseLeave);
+      this.onDocumentMouseLeave = null;
+    }
+    if (this.onWindowBlur) {
+      window.removeEventListener("blur", this.onWindowBlur);
+      this.onWindowBlur = null;
     }
     this.isDraggingShip = false;
     this.lastShipDragAngle = null;
@@ -702,6 +722,10 @@ class TravelCalculatorUI {
 
     html.on("mouseover", ".compass-sector", (e) => {
       if (!this.isDraggingShip) return;
+      if (typeof e.buttons === "number" && (e.buttons & 1) === 0) {
+        this.finishShipDrag();
+        return;
+      }
       const el = $(e.currentTarget);
       const type = el.data("type");
       if (type !== "ship") return;
@@ -709,6 +733,15 @@ class TravelCalculatorUI {
       if (!Number.isFinite(angle)) return;
       this.lastShipDragAngle = angle;
       updateCompassSelection("ship", angle, false);
+    });
+
+    html.on("mouseup", ".compass-sector", (e) => {
+      if (!this.isDraggingShip) return;
+      const el = $(e.currentTarget);
+      const type = el.data("type");
+      if (type !== "ship") return;
+      const angle = parseInt(el.data("angle"), 10);
+      this.finishShipDrag(angle);
     });
 
     html.find("#sendToChat").on("click", () => {
