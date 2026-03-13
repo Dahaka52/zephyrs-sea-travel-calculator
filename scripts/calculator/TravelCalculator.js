@@ -94,6 +94,8 @@ var SeaTravelCalculator = (() => {
               const api = game?.seaTravelCalculator;
               const ui = api?._uiInstance;
               if (ui && typeof ui.rerenderWithLanguage === "function") ui.rerenderWithLanguage();
+              const weatherUi = api?._weatherUIInstance;
+              if (weatherUi && typeof weatherUi.rerenderWithLanguage === "function") weatherUi.rerenderWithLanguage();
             } catch (e) {
               console.warn("Zephyr: failed to apply language change", e);
             }
@@ -452,6 +454,7 @@ var SeaTravelCalculator = (() => {
   return {
     _calculatorInstance: null,
     _uiInstance: null,
+    _weatherUIInstance: null,
 
     registerSettings: function() {
       const calc = this.getInstance();
@@ -474,6 +477,13 @@ var SeaTravelCalculator = (() => {
       return this._uiInstance;
     },
 
+    initializeWeather: function() {
+      if (!this._weatherUIInstance) {
+        this._weatherUIInstance = new WeatherGeneratorUI();
+      }
+      return this._weatherUIInstance;
+    },
+
     openCalculator: function() {
       const ui = this.initialize();
       ui.render();
@@ -483,6 +493,12 @@ var SeaTravelCalculator = (() => {
     toggleCalculator: function() {
       const ui = this.initialize();
       ui.toggle();
+      return ui;
+    },
+
+    openWeatherGenerator: function() {
+      const ui = this.initializeWeather();
+      ui.render();
       return ui;
     },
 

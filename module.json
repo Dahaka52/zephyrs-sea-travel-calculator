@@ -2,7 +2,7 @@
   "id": "zephyrs-sea-travel-calculator",
   "title": "Zephyr's Sea Travel Calculator",
   "description": "Реалистичный калькулятор морских путешествий",
-  "version": "0.3.7",
+  "version": "0.4.0",
   "authors": [
     {
       "name": "Zephyr"
@@ -18,6 +18,7 @@
     "scripts/calculator/TravelCalculator.js",
     "scripts/ui/ChatRenderer.js",
     "scripts/ui/TravelCalculatorUI.js",
+    "scripts/ui/WeatherGeneratorUI.js",
     "scripts/main.js"
   ],
   "styles": [

@@ -96,7 +96,19 @@ var ZEPHYR_I18N = {
     WAVE_STWAVE_SUB: "2-4 м",
     WAVE_STORM: "Ураган",
     WAVE_STORM_SUB: "4-8+ м",
-    WAVES_LABEL: "Волны"
+    WAVES_LABEL: "Волны",
+    WEATHER_TITLE: "Генератор морской погоды",
+    WEATHER_ZONE: "Климатический пояс:",
+    WEATHER_SEASON: "Сезон:",
+    WEATHER_HOUR: "Текущий час:",
+    WEATHER_GM_ONLY: "Выводить только ГМ",
+    WEATHER_GENERATE: "Сгенерировать",
+    WEATHER_HEADER: "🌤️ Погода",
+    WEATHER_WIND_DIR: "Направление ветра",
+    WEATHER_CONDITIONS: "Условия",
+    WEATHER_WIND_WAVES: "Ветер и волны",
+    WEATHER_DURATION: "Длительность",
+    WEATHER_NEXT: "Следующая смена погоды"
   },
   en: {
     CALC_TITLE: "🧭 Sea Travel Calculator",
@@ -188,7 +200,19 @@ var ZEPHYR_I18N = {
     WAVE_STWAVE_SUB: "2-4 m",
     WAVE_STORM: "Hurricane",
     WAVE_STORM_SUB: "4-8+ m",
-    WAVES_LABEL: "Waves"
+    WAVES_LABEL: "Waves",
+    WEATHER_TITLE: "Sea Weather Generator",
+    WEATHER_ZONE: "Climate zone:",
+    WEATHER_SEASON: "Season:",
+    WEATHER_HOUR: "Current hour:",
+    WEATHER_GM_ONLY: "Whisper to GM only",
+    WEATHER_GENERATE: "Generate",
+    WEATHER_HEADER: "🌤️ Weather",
+    WEATHER_WIND_DIR: "Wind direction",
+    WEATHER_CONDITIONS: "Conditions",
+    WEATHER_WIND_WAVES: "Wind and waves",
+    WEATHER_DURATION: "Duration",
+    WEATHER_NEXT: "Next weather change"
   }
 };
 

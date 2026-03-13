@@ -41,7 +41,8 @@ zephyrs-sea-travel-calculator/
 │  │  └─ TravelCalculator.js           # Основной singleton/API, расчёт скорости и перехода
 │  ├─ ui/
 │  │  ├─ TravelCalculatorUI.js         # Dialog UI, обработчики формы, live-расчёт
-│  │  └─ ChatRenderer.js               # HTML-рендер отчёта и отправка в чат
+│  │  ├─ ChatRenderer.js               # HTML-рендер отчёта и отправка в чат
+│  │  └─ WeatherGeneratorUI.js         # UI генератора морской погоды
 │  └─ utils/
 │     └─ helpers.js                    # Создание макроса для быстрого открытия калькулятора
 ├─ styles/
@@ -59,7 +60,7 @@ zephyrs-sea-travel-calculator/
 4. `helpers.js` -> утилиты (макросы);
 5. `ShipStateCalculator.js` -> вычислитель состояния;
 6. `TravelCalculator.js` -> основной API;
-7. `ChatRenderer.js`, `TravelCalculatorUI.js` -> UI и чат;
+7. `ChatRenderer.js`, `TravelCalculatorUI.js`, `WeatherGeneratorUI.js` -> UI и чат;
 8. `main.js` -> инициализация через `Hooks`.
 
 ### Hooks
@@ -199,6 +200,8 @@ zephyrs-sea-travel-calculator/
 - поддержка переключения языка интерфейса через настройки модуля;
 - сохранение размеров/позиции окна через `ResizeObserver`.
 
+Отдельный диалог генератора погоды открывается через `game.seaTravelCalculator.openWeatherGenerator()` или одноимённый макрос.
+
 Ключевые методы:
 
 - `render()` / `closeDialog()`
@@ -243,6 +246,7 @@ zephyrs-sea-travel-calculator/
 - `initialize()`
 - `openCalculator()`
 - `toggleCalculator()`
+- `openWeatherGenerator()`
 - `calculateShipSpeed(shipId, conditions)`
 - `calculateTravel(conditions)`
 - `getShip(shipId)`
@@ -296,7 +300,7 @@ const speed = game.seaTravelCalculator.calculateShipSpeed("Sloop", {
 
 - В настройках Foundry доступен параметр `uiLanguage` (по умолчанию `ru`).
 - Переключение языка влияет на UI калькулятора и текст чата.
-- Макрос погоды пока использует русские строки; для локализации потребуется расширение словаря и данных.
+- Генератор погоды использует тот же язык, что и UI калькулятора.
 - Локализация поддерживается через:
   - словарь `ZEPHYR_I18N` (статические строки интерфейса);
   - поля `*_en` в данных (`conditions.js`, `ships.js`) для подписей и описаний.
