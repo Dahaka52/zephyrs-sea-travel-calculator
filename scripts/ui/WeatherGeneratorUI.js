@@ -1,6 +1,12 @@
 class WeatherGeneratorUI {
   constructor() {
     this.dialog = null;
+    this.resizeObserver = null;
+    this.trackedWindowElement = null;
+    this.onWindowMouseUp = null;
+    this.windowSaveDebounceMs = 300;
+    this.pendingWindowSaveTimer = null;
+    this.pendingWindowSettings = null;
   }
 
   t(key, vars) {
@@ -42,13 +48,19 @@ class WeatherGeneratorUI {
     const CLIMATE = WeatherGeneratorUI.CLIMATE;
     const zoneKeys = Object.keys(CLIMATE);
 
-    const savedHour = game.user.getFlag(MODULE_ID, F_HOUR) || 12;
-    const savedZone = game.user.getFlag(MODULE_ID, F_ZONE) || zoneKeys[0];
+    const lastInput = game.settings.get(MODULE_ID, "weatherLastInput") || {};
+    const savedHour = (Number.isFinite(lastInput.currentHour) ? lastInput.currentHour : null)
+      ?? (game.user.getFlag(MODULE_ID, F_HOUR) || 12);
+    const savedZone = (lastInput.zone && CLIMATE[lastInput.zone] ? lastInput.zone : null)
+      ?? (game.user.getFlag(MODULE_ID, F_ZONE) || zoneKeys[0]);
     const activeZone = CLIMATE[savedZone] ? savedZone : zoneKeys[0];
-    const savedSeason = game.user.getFlag(MODULE_ID, F_SEASON) || CLIMATE[activeZone].seasons[0];
+    const savedSeason = (lastInput.season && CLIMATE[activeZone].seasons.includes(lastInput.season))
+      ? lastInput.season
+      : (game.user.getFlag(MODULE_ID, F_SEASON) || CLIMATE[activeZone].seasons[0]);
     const activeSeason = CLIMATE[activeZone].seasons.includes(savedSeason)
       ? savedSeason
       : CLIMATE[activeZone].seasons[0];
+    const savedGmOnly = !!lastInput.gmOnly;
 
     const SELECT_STYLE = "width:100%;background:rgba(20, 15, 10, 0.9);color:#e8d5b5;border:1px solid rgba(184, 144, 92, 0.5);";
     const OPTION_STYLE = "background-color:#2a1c14;color:#e8d5b5;";
@@ -96,17 +108,34 @@ class WeatherGeneratorUI {
             `<div class="calc-row">` +
               `<div class="calc-label"></div>` +
               `<div class="calc-control">` +
-                `<label class="zephyr-checkbox-line"><input type="checkbox" id="gmOnly"> ${this.t("WEATHER_GM_ONLY")}</label>` +
+                `<label class="zephyr-checkbox-line"><input type="checkbox" id="gmOnly" ${savedGmOnly ? "checked" : ""}> ${this.t("WEATHER_GM_ONLY")}</label>` +
               `</div>` +
             `</div>` +
           `</form>` +
         `</div>` +
       `</div>`;
 
+    const ws = game.settings.get(MODULE_ID, "weatherWindowSettings") || {};
+    const defaults = { width: 640, height: 520, top: null, left: null };
+    const options = {
+      width: Number(ws.width) > 0 ? Number(ws.width) : defaults.width,
+      height: Number(ws.height) > 0 ? Number(ws.height) : defaults.height,
+      resizable: true,
+      classes: ["zephyr-calculator", "zephyr-weather", "flexcol"]
+    };
+    if (Number.isFinite(ws.top)) options.top = ws.top;
+    if (Number.isFinite(ws.left)) options.left = ws.left;
+    options.position = {
+      width: options.width,
+      height: options.height,
+      ...(Number.isFinite(ws.top) ? { top: ws.top } : {}),
+      ...(Number.isFinite(ws.left) ? { left: ws.left } : {}),
+      resizable: true
+    };
+
     this.dialog = new Dialog({
       title: this.t("WEATHER_TITLE"),
       content,
-      classes: ["zephyr-calculator", "zephyr-weather", "flexcol"],
       render: (html) => {
         const appEl = html.closest(".app, .window-app");
         if (appEl.length) appEl.addClass("zephyr-calculator zephyr-weather");
@@ -179,6 +208,7 @@ class WeatherGeneratorUI {
             const durationHours = Math.floor(Math.random() * (dur.max - dur.min + 1)) + dur.min;
             const nextHour = WeatherGeneratorUI.addHoursToHour(currentHour, durationHours);
             await game.user.setFlag(MODULE_ID, F_HOUR, nextHour);
+            html.find("#currentHour").val(nextHour);
 
             const curLabel = WeatherGeneratorUI.fmtHour(currentHour);
             const nextLabel = WeatherGeneratorUI.fmtHour(nextHour);
@@ -217,20 +247,16 @@ class WeatherGeneratorUI {
               console.error("Weather generator error:", err);
               ChatMessage.create({ content: `<pre>${this.t("ERROR_PREFIX")} ${err}</pre>` });
             }
+            return false;
           }
         }
       },
       default: "ok",
-      close: () => {
-        this.dialog = null;
-      }
-    }, {
-      width: 640,
-      height: "auto",
-      resizable: true
-    });
+      close: (html) => this.closeDialog(html)
+    }, options);
 
     this.dialog.render(true);
+    setTimeout(() => this.setupWindowTracking(), 0);
   }
 
   rerenderWithLanguage() {
@@ -241,6 +267,112 @@ class WeatherGeneratorUI {
     } catch (e) {
       console.warn("Zephyr: failed to rerender weather generator after language change", e);
     }
+  }
+
+  getDialogElement() {
+    if (!this.dialog) return null;
+    const el = this.dialog.element?.[0] ?? this.dialog.element;
+    if (el instanceof HTMLElement) return el;
+    if (!this.dialog?.appId) return null;
+    return document.querySelector(`[data-appid="${this.dialog.appId}"]`);
+  }
+
+  setupWindowTracking() {
+    const dialogElement = this.getDialogElement();
+    if (!dialogElement) return;
+
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(() => this.saveWindowPosition());
+      this.resizeObserver.observe(dialogElement);
+    }
+
+    const jqElement = $(dialogElement);
+    this.trackedWindowElement = jqElement;
+    this.onWindowMouseUp = () => setTimeout(() => this.saveWindowPosition(), 100);
+    jqElement.on("mouseup", this.onWindowMouseUp);
+  }
+
+  teardownWindowTracking() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+      this.resizeObserver = null;
+    }
+    if (this.trackedWindowElement && this.onWindowMouseUp) {
+      this.trackedWindowElement.off("mouseup", this.onWindowMouseUp);
+    }
+    this.trackedWindowElement = null;
+    this.onWindowMouseUp = null;
+  }
+
+  saveWindowPosition() {
+    const dialogElement = this.getDialogElement();
+    if (!dialogElement) return;
+    const rect = dialogElement.getBoundingClientRect();
+    const settings = {
+      width: Math.round(rect.width),
+      height: Math.min(Math.round(rect.height), Math.round(window.innerHeight * 0.9)),
+      top: Math.round(rect.top),
+      left: Math.round(rect.left)
+    };
+    this.scheduleWindowSave(settings);
+  }
+
+  scheduleWindowSave(settings) {
+    this.pendingWindowSettings = settings;
+    if (this.pendingWindowSaveTimer) clearTimeout(this.pendingWindowSaveTimer);
+    this.pendingWindowSaveTimer = setTimeout(() => this.flushWindowSave(), this.windowSaveDebounceMs);
+  }
+
+  flushWindowSave() {
+    if (this.pendingWindowSaveTimer) {
+      clearTimeout(this.pendingWindowSaveTimer);
+      this.pendingWindowSaveTimer = null;
+    }
+    if (!this.pendingWindowSettings) return;
+    const current = game.settings.get(ZEPHYR_MODULE_ID, "weatherWindowSettings") || {};
+    const next = this.pendingWindowSettings;
+    const unchanged = current
+      && current.width === next.width
+      && current.height === next.height
+      && current.top === next.top
+      && current.left === next.left;
+    this.pendingWindowSettings = null;
+    if (unchanged) return;
+    game.settings.set(ZEPHYR_MODULE_ID, "weatherWindowSettings", next);
+  }
+
+  getFormData(html) {
+    const root = html?.find ? html : null;
+    if (!root) return null;
+    return {
+      zone: root.find("#zone").val(),
+      season: root.find("#season").val(),
+      currentHour: parseInt(root.find("#currentHour").val(), 10) || 12,
+      gmOnly: !!root.find("#gmOnly")[0]?.checked
+    };
+  }
+
+  saveLastInput(data) {
+    if (!data) return;
+    game.settings.set(ZEPHYR_MODULE_ID, "weatherLastInput", data);
+  }
+
+  closeDialog(html) {
+    const data = this.getFormData(html);
+    if (data) {
+      this.saveLastInput(data);
+      try {
+        game.user.setFlag(ZEPHYR_MODULE_ID, "weatherZone", data.zone);
+        game.user.setFlag(ZEPHYR_MODULE_ID, "weatherSeason", data.season);
+        game.user.setFlag(ZEPHYR_MODULE_ID, "weatherNextHour", data.currentHour);
+      } catch (e) {
+        console.warn("Zephyr: failed to persist weather flags on close", e);
+      }
+    }
+    this.saveWindowPosition();
+    this.flushWindowSave();
+    this.teardownWindowTracking();
+    this.dialog = null;
   }
 
   static hourToCategory(h) {

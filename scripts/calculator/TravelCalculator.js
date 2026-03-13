@@ -79,6 +79,26 @@ var SeaTravelCalculator = (() => {
         });
       }
 
+      const weatherInputKey = `${ZEPHYR_MODULE_ID}.weatherLastInput`;
+      if (!game.settings.settings.has(weatherInputKey)) {
+        game.settings.register(ZEPHYR_MODULE_ID, "weatherLastInput", {
+          scope: "client",
+          config: false,
+          type: Object,
+          default: { zone: null, season: null, currentHour: 12, gmOnly: false }
+        });
+      }
+
+      const weatherWindowKey = `${ZEPHYR_MODULE_ID}.weatherWindowSettings`;
+      if (!game.settings.settings.has(weatherWindowKey)) {
+        game.settings.register(ZEPHYR_MODULE_ID, "weatherWindowSettings", {
+          scope: "client",
+          config: false,
+          type: Object,
+          default: { width: 640, height: 520, top: null, left: null }
+        });
+      }
+
       const languageKey = `${ZEPHYR_MODULE_ID}.uiLanguage`;
       if (!game.settings.settings.has(languageKey)) {
         game.settings.register(ZEPHYR_MODULE_ID, "uiLanguage", {
